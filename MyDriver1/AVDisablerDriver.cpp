@@ -276,7 +276,7 @@ VOID UnloadRoutine(PDRIVER_OBJECT DriverObject)
 
 	if (g_IsMalwareBytesCallbackRoutineSet)
 	{
-		status = PsSetCreateProcessNotifyRoutineEx(&PreventMalwareBytesProcessCreate, TRUE); <- needs to be defined first
+		status = PsSetCreateProcessNotifyRoutineEx(&PreventMalwareBytesProcessCreate, TRUE); //<- needs to be defined first
 		if (!NT_SUCCESS(status))
 			KdPrint(("[-] AVDsiablerDriver::UnloadRoutine: Failed to unset MalwareBytes' related process creation callback routine\n (NTSTATUS: 0x%x)", status));
 	}
