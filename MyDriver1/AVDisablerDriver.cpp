@@ -9,6 +9,8 @@
 #define IOCTL_DISABLE_ESET CTL_CODE(DeviceType, 0x802, METHOD_BUFFERED, FILE_ANY_ACCESS)			
 #define IOCTL_DISABLE_MALWAREBYTES CTL_CODE(DeviceType, 0x803, METHOD_BUFFERED, FILE_ANY_ACCESS)	
 
+//TODO: Add an initial process termination functiona that will be called at the start of each process creation callback routine 
+//	on each UNICODE_STRING image related to the AV Vendor (Defender, ESET, Malwarebytes) etc...
 
 typedef NTSTATUS(NTAPI* fObOpenObjectByPointer)(
 	PVOID Object,
