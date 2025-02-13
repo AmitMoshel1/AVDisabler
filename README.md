@@ -1,4 +1,4 @@
-# AVDisabler Driver - A driver that disables the AV that's activated within the OS
+# AVDisabler Driver - AV Disabling Driver
 
 Still In development process!
 
